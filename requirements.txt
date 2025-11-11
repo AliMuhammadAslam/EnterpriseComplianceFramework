@@ -1,4 +1,5 @@
 litellm
 python-dotenv
 pydantic
-logging
+requests
+flask
