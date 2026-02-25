@@ -1,0 +1,10 @@
+litellm
+python-dotenv
+pydantic
+requests
+flask
+chromadb
+openai
+python-docx
+PyPDF2
+tiktoken
