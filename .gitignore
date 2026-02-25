@@ -1,3 +1,8 @@
-venv/
+__pycache__
 .env
+chroma_db/
+uploads/
+*.pyc
 agent_memory.json
+venv/
+*.log

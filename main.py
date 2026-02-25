@@ -50,7 +50,7 @@ class AgentCLI:
                     continue
                 
                 print("Agent: Processing request...")
-                result = self.orchestrator.run(user_input, verbose=verbose_mode)
+                result = self.orchestrator.run(user_input, verbose=verbose_mode, user_id="cli_user")
                 
                 if result.success:
                     print(f"Agent: {result.result}")

@@ -111,7 +111,7 @@ class Memory:
         session_entry = MemoryEntry(
             id=f"session_{datetime.now().timestamp()}",
             content={
-                "interactions": [entry.dict()
+                "interactions": [entry.model_dump()
                                  for entry in self.short_term_memory],
                 "session_summary": (f"Conversation with "
                                     f"{len(self.short_term_memory)} "
@@ -150,7 +150,7 @@ class Memory:
     def _save_persistent_memory(self):
         try:
             data = {
-                'long_term': [entry.dict() for entry in self.long_term_memory]
+                'long_term': [entry.model_dump() for entry in self.long_term_memory]
             }
             with open(self.memory_file, 'w') as f:
                 json.dump(data, f, default=str, indent=2)

@@ -3,35 +3,59 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Agent</title>
+    <title>Compliance Agent</title>
     <style>
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background-color: #f5f5f5;
             color: #333;
         }
-        
+
         .container {
-            max-width: 1200px;
+            max-width: 1400px;
             margin: 0 auto;
             height: 100vh;
             display: flex;
             flex-direction: column;
         }
-        
+
         .header {
-            background-color: #2c3e50;
+            background-color: #1a2332;
             color: white;
-            padding: 1rem;
-            text-align: center;
+            padding: 0.75rem 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
         }
-        
+
+        .header h1 {
+            font-size: 1.2rem;
+        }
+
+        .header-status {
+            display: flex;
+            gap: 1rem;
+            font-size: 0.8rem;
+            opacity: 0.8;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .status-dot.active { background-color: #2ecc71; }
+        .status-dot.inactive { background-color: #e74c3c; }
+
         .main-content {
             flex: 1;
             display: flex;
@@ -39,7 +63,7 @@
             padding: 1rem;
             overflow: hidden;
         }
-        
+
         .chat-section {
             flex: 2;
             display: flex;
@@ -48,139 +72,278 @@
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
-        
+
         .sidebar {
             flex: 1;
             display: flex;
             flex-direction: column;
-            gap: 1rem;
+            gap: 0.75rem;
+            max-width: 380px;
         }
-        
-        .logs-panel {
+
+        .panel {
             background: white;
             border-radius: 8px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 0.75rem;
+        }
+
+        .panel h3 {
+            font-size: 0.9rem;
+            margin-bottom: 0.5rem;
+            color: #1a2332;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.4rem;
+        }
+
+        /* Upload Panel */
+        .upload-area {
+            border: 2px dashed #bdc3c7;
+            border-radius: 6px;
             padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 0.5rem;
+        }
+
+        .upload-area:hover, .upload-area.drag-over {
+            border-color: #3498db;
+            background-color: #f0f8ff;
+        }
+
+        .upload-area p {
+            font-size: 0.85rem;
+            color: #7f8c8d;
+        }
+
+        .upload-area .format-hint {
+            font-size: 0.75rem;
+            color: #95a5a6;
+            margin-top: 0.3rem;
+        }
+
+        .doc-list {
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 0.8rem;
+        }
+
+        .doc-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.3rem 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .doc-item .doc-name {
             flex: 1;
             overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .doc-item .doc-chunks {
+            color: #95a5a6;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+
+        .doc-item .delete-btn {
+            background: none;
+            border: none;
+            color: #e74c3c;
+            cursor: pointer;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+
+        /* Evaluation Panel */
+        .eval-form {
             display: flex;
             flex-direction: column;
+            gap: 0.4rem;
         }
-        
+
+        .eval-form label {
+            font-size: 0.8rem;
+            color: #555;
+        }
+
+        .eval-form input, .eval-form select {
+            padding: 0.4rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        }
+
+        .eval-btn {
+            padding: 0.5rem;
+            background-color: #27ae60;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-top: 0.3rem;
+        }
+
+        .eval-btn:hover { background-color: #219a52; }
+        .eval-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        /* Chat */
         .chat-messages {
             flex: 1;
             overflow-y: auto;
             padding: 1rem;
             border-bottom: 1px solid #eee;
         }
-        
+
         .message {
             margin-bottom: 1rem;
             padding: 0.75rem;
             border-radius: 8px;
-            max-width: 80%;
+            max-width: 85%;
+            font-size: 0.9rem;
+            line-height: 1.5;
         }
-        
+
         .user-message {
             background-color: #3498db;
             color: white;
             margin-left: auto;
         }
-        
+
         .agent-message {
             background-color: #ecf0f1;
             color: #2c3e50;
         }
-        
+
+        .agent-message pre {
+            background-color: #dfe6e9;
+            padding: 0.5rem;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 0.82rem;
+            margin-top: 0.5rem;
+        }
+
         .chat-input {
-            padding: 1rem;
+            padding: 0.75rem;
             display: flex;
             gap: 0.5rem;
         }
-        
+
         .chat-input input {
             flex: 1;
-            padding: 0.75rem;
+            padding: 0.6rem;
             border: 1px solid #ddd;
             border-radius: 4px;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
-        
+
         .chat-input button {
-            padding: 0.75rem 1.5rem;
+            padding: 0.6rem 1.2rem;
             background-color: #3498db;
             color: white;
             border: none;
             border-radius: 4px;
             cursor: pointer;
-            font-size: 1rem;
+            font-size: 0.9rem;
         }
-        
-        .chat-input button:hover {
-            background-color: #2980b9;
-        }
-        
-        .chat-input button:disabled {
-            background-color: #bdc3c7;
-            cursor: not-allowed;
-        }
-        
+
+        .chat-input button:hover { background-color: #2980b9; }
+        .chat-input button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+        /* Logs */
         .logs-content {
-            flex: 1;
+            max-height: 150px;
             overflow-y: auto;
-            background-color: #2c3e50;
+            background-color: #1a2332;
             color: #ecf0f1;
-            padding: 1rem;
+            padding: 0.5rem;
             font-family: 'Courier New', monospace;
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             border-radius: 4px;
         }
-        
-        .log-entry {
-            margin-bottom: 0.25rem;
-            word-wrap: break-word;
+
+        .log-entry { margin-bottom: 0.15rem; word-wrap: break-word; }
+
+        .upload-progress {
+            display: none;
+            font-size: 0.8rem;
+            color: #3498db;
+            margin-top: 0.3rem;
         }
-        
+
         @media (max-width: 768px) {
-            .main-content {
-                flex-direction: column;
-            }
-            
-            .chat-section {
-                height: 60vh;
-            }
-            
-            .sidebar {
-                height: 40vh;
-            }
+            .main-content { flex-direction: column; }
+            .chat-section { height: 50vh; }
+            .sidebar { max-width: 100%; height: 50vh; overflow-y: auto; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>AI Agent</h1>
+            <h1>🛡️ Compliance Agent</h1>
+            <div class="header-status">
+                <span><span class="status-dot active" id="kbDot"></span>KB: <span id="kbStatus">Loading...</span></span>
+                <span>Strategy: Plan & Execute + RAG</span>
+            </div>
         </div>
-        
+
         <div class="main-content">
             <div class="chat-section">
                 <div class="chat-messages" id="chatMessages">
                     <div class="message agent-message">
-                        <strong>Agent:</strong> Hello! I'm ready to help you. You can ask me questions, request calculations, or search for information.
+                        <strong>Agent:</strong> Welcome! I'm a compliance and governance assistant powered by a regulatory knowledge base (ISO 27001, SOC 2, GDPR, NIST, HIPAA, PCI DSS, COBIT).<br><br>
+                        You can:<br>
+                        • Ask questions about compliance standards<br>
+                        • Upload your company documents (PDF, DOCX, TXT)<br>
+                        • Run a compliance evaluation against your documents
                     </div>
                 </div>
-                
+
                 <div class="chat-input">
-                    <input type="text" id="messageInput" placeholder="Type your message here..." onkeypress="handleKeyPress(event)">
+                    <input type="text" id="messageInput" placeholder="Ask about compliance, standards, or your documents..." onkeypress="handleKeyPress(event)">
                     <button onclick="sendMessage()" id="sendButton">Send</button>
                 </div>
             </div>
-            
+
             <div class="sidebar">
-                <div class="logs-panel">
-                    <h3>Execution Logs</h3>
+                <!-- Document Upload Panel -->
+                <div class="panel">
+                    <h3>📄 Company Documents</h3>
+                    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                        <p>Drop files here or click to upload</p>
+                        <p class="format-hint">PDF, DOCX, TXT (max 50MB)</p>
+                    </div>
+                    <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.txt" onchange="uploadFile(this)">
+                    <div class="upload-progress" id="uploadProgress">Uploading...</div>
+                    <div class="doc-list" id="docList"></div>
+                </div>
+
+                <!-- Evaluation Panel -->
+                <div class="panel">
+                    <h3>📊 Compliance Evaluation</h3>
+                    <div class="eval-form">
+                        <label>Industry</label>
+                        <input type="text" id="evalIndustry" placeholder="e.g., Fintech">
+                        <label>Country</label>
+                        <input type="text" id="evalCountry" placeholder="e.g., Pakistan">
+                        <button class="eval-btn" onclick="runEvaluation()" id="evalButton">
+                            Run Evaluation
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Logs Panel -->
+                <div class="panel" style="flex:1; display:flex; flex-direction:column;">
+                    <h3>📋 Execution Logs</h3>
                     <div class="logs-content" id="logsContent">
-                        <div class="log-entry">Execution logs will appear here...</div>
+                        <div class="log-entry">Ready.</div>
                     </div>
                 </div>
             </div>
@@ -188,97 +351,214 @@
     </div>
 
     <script>
+        const USER_ID = 'default';
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadKBStatus();
+            loadDocuments();
+            setupDragDrop();
+        });
+
+        function setupDragDrop() {
+            const area = document.getElementById('uploadArea');
+            ['dragenter', 'dragover'].forEach(e => {
+                area.addEventListener(e, (ev) => { ev.preventDefault(); area.classList.add('drag-over'); });
+            });
+            ['dragleave', 'drop'].forEach(e => {
+                area.addEventListener(e, (ev) => { ev.preventDefault(); area.classList.remove('drag-over'); });
+            });
+            area.addEventListener('drop', (e) => {
+                const files = e.dataTransfer.files;
+                if (files.length > 0) uploadFileObj(files[0]);
+            });
+        }
+
+        async function loadKBStatus() {
+            try {
+                const res = await fetch('/knowledge/status');
+                const data = await res.json();
+                const dot = document.getElementById('kbDot');
+                const status = document.getElementById('kbStatus');
+                if (data.populated) {
+                    dot.className = 'status-dot active';
+                    status.textContent = `${data.document_count} chunks`;
+                } else {
+                    dot.className = 'status-dot inactive';
+                    status.textContent = 'Empty';
+                }
+            } catch (e) {
+                document.getElementById('kbStatus').textContent = 'Error';
+            }
+        }
+
+        async function loadDocuments() {
+            try {
+                const res = await fetch(`/documents?user_id=${USER_ID}`);
+                const data = await res.json();
+                const list = document.getElementById('docList');
+                list.innerHTML = '';
+                if (data.documents && data.documents.length > 0) {
+                    data.documents.forEach(doc => {
+                        const div = document.createElement('div');
+                        div.className = 'doc-item';
+                        div.innerHTML = `
+                            <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                            <span class="doc-chunks">${doc.chunk_count} chunks</span>
+                            <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete">✕</button>
+                        `;
+                        list.appendChild(div);
+                    });
+                }
+            } catch (e) {
+                console.error('Error loading documents:', e);
+            }
+        }
+
+        function uploadFile(input) {
+            if (input.files.length > 0) uploadFileObj(input.files[0]);
+        }
+
+        async function uploadFileObj(file) {
+            const progress = document.getElementById('uploadProgress');
+            progress.style.display = 'block';
+            progress.textContent = `Uploading ${file.name}...`;
+
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('user_id', USER_ID);
+
+            try {
+                const res = await fetch('/upload', { method: 'POST', body: formData });
+                const data = await res.json();
+
+                if (data.success) {
+                    progress.textContent = `✓ ${file.name}: ${data.chunks} chunks`;
+                    addMessage('agent', `Document "${file.name}" uploaded successfully. ${data.chunks} chunks indexed (${data.characters} characters). You can now ask questions about this document or run a compliance evaluation.`);
+                    loadDocuments();
+                } else {
+                    progress.textContent = `✗ Error: ${data.error}`;
+                }
+            } catch (e) {
+                progress.textContent = `✗ Upload failed: ${e.message}`;
+            }
+
+            setTimeout(() => { progress.style.display = 'none'; }, 5000);
+            document.getElementById('fileInput').value = '';
+        }
+
+        async function deleteDocument(docId) {
+            if (!confirm('Delete this document?')) return;
+            try {
+                await fetch(`/documents/${docId}?user_id=${USER_ID}`, { method: 'DELETE' });
+                loadDocuments();
+            } catch (e) {
+                console.error('Error deleting document:', e);
+            }
+        }
+
+        async function runEvaluation() {
+            const btn = document.getElementById('evalButton');
+            btn.disabled = true;
+            btn.textContent = 'Evaluating...';
+
+            const industry = document.getElementById('evalIndustry').value;
+            const country = document.getElementById('evalCountry').value;
+
+            addMessage('user', `Run compliance evaluation${industry ? ' for ' + industry : ''}${country ? ' in ' + country : ''}`);
+            document.getElementById('logsContent').innerHTML = '<div class="log-entry">Running compliance evaluation...</div>';
+
+            try {
+                const res = await fetch('/evaluate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: USER_ID, industry, country })
+                });
+                const data = await res.json();
+
+                if (data.error) {
+                    addMessage('agent', `Error: ${data.error}`);
+                } else {
+                    addMessage('agent', data.report);
+                }
+            } catch (e) {
+                addMessage('agent', `Evaluation failed: ${e.message}`);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Run Evaluation';
+        }
+
         function handleKeyPress(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
                 sendMessage();
             }
         }
-        
+
         async function sendMessage() {
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
-            
             if (!message) return;
-            
-            // Add user message to chat
+
             addMessage('user', message);
             input.value = '';
-            
-            // Disable send button
+
             const sendButton = document.getElementById('sendButton');
             sendButton.disabled = true;
             sendButton.textContent = 'Processing...';
-            
-            // Clear logs
+
             document.getElementById('logsContent').innerHTML = '<div class="log-entry">Processing...</div>';
-            
+
             try {
                 const response = await fetch('/chat', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        message: message,
-                        verbose: true  // Always verbose
-                    })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message, verbose: true, user_id: USER_ID })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     addMessage('agent', `Error: ${data.error}`);
                 } else {
                     let responseText = data.response;
                     if (data.strategy) {
                         responseText += `\n\n(Strategy: ${data.strategy}`;
-                        if (data.steps > 0) {
-                            responseText += `, Steps: ${data.steps}`;
-                        }
+                        if (data.steps > 0) responseText += `, Steps: ${data.steps}`;
                         responseText += ')';
                     }
                     addMessage('agent', responseText);
-                    
-                    // Display logs
-                    if (data.logs) {
-                        displayLogs(data.logs);
-                    }
+                    if (data.logs) displayLogs(data.logs);
                 }
-                
             } catch (error) {
                 addMessage('agent', `Error: ${error.message}`);
             }
-            
-            // Re-enable send button
+
             sendButton.disabled = false;
             sendButton.textContent = 'Send';
         }
-        
+
         function addMessage(sender, content) {
-            const messagesContainer = document.getElementById('chatMessages');
-            const messageDiv = document.createElement('div');
-            messageDiv.className = `message ${sender}-message`;
-            
-            const senderLabel = sender === 'user' ? 'You' : 'Agent';
-            messageDiv.innerHTML = `<strong>${senderLabel}:</strong> ${content.replace(/\n/g, '<br>')}`;
-            
-            messagesContainer.appendChild(messageDiv);
-            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            const container = document.getElementById('chatMessages');
+            const div = document.createElement('div');
+            div.className = `message ${sender}-message`;
+            const label = sender === 'user' ? 'You' : 'Agent';
+            div.innerHTML = `<strong>${label}:</strong> ${content.replace(/\n/g, '<br>')}`;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
         }
-        
+
         function displayLogs(logs) {
-            const logsContainer = document.getElementById('logsContent');
-            logsContainer.innerHTML = '';
-            
+            const container = document.getElementById('logsContent');
+            container.innerHTML = '';
             logs.forEach(log => {
-                const logDiv = document.createElement('div');
-                logDiv.className = 'log-entry';
-                logDiv.textContent = log;
-                logsContainer.appendChild(logDiv);
+                const div = document.createElement('div');
+                div.className = 'log-entry';
+                div.textContent = log;
+                container.appendChild(div);
             });
-            
-            logsContainer.scrollTop = logsContainer.scrollHeight;
+            container.scrollTop = container.scrollHeight;
         }
     </script>
 </body>
