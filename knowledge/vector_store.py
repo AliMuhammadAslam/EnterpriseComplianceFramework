@@ -59,15 +59,22 @@ class VectorStore:
         self, query: str, top_k: int = 5
     ) -> List[Dict[str, Any]]:
         """Query the global regulatory knowledge base."""
-        collection = self._get_or_create_collection("regulatory_knowledge")
-        if collection.count() == 0:
+        try:
+            collection = self._get_or_create_collection("regulatory_knowledge")
+            if collection.count() == 0:
+                return []
+            query_embedding = self.embedding_service.embed_text(query)
+            results = collection.query(
+                query_embeddings=[query_embedding],
+                n_results=min(top_k, collection.count()),
+            )
+            return self._format_results(results)
+        except Exception as e:
+            self.logger.warning(
+                f"ChromaDB query failed for regulatory_knowledge, "
+                f"returning empty results: {e}"
+            )
             return []
-        query_embedding = self.embedding_service.embed_text(query)
-        results = collection.query(
-            query_embeddings=[query_embedding],
-            n_results=min(top_k, collection.count()),
-        )
-        return self._format_results(results)
 
     def knowledge_count(self) -> int:
         """Return number of documents in the knowledge base."""
@@ -104,11 +111,8 @@ class VectorStore:
         collection_name = f"company_docs_{user_id}"
         try:
             collection = self.client.get_collection(collection_name)
-        except Exception:
-            return []
-        if collection.count() == 0:
-            return []
-        try:
+            if collection.count() == 0:
+                return []
             query_embedding = self.embedding_service.embed_text(query)
             results = collection.query(
                 query_embeddings=[query_embedding],
