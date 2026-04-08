@@ -2,118 +2,106 @@ from pydantic import BaseModel
 from litellm import completion
 from dotenv import load_dotenv
 import os
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from utils.logger import logger_instance
 
-
-class PerceptionInput(BaseModel):
-    content: str
-    source: str = "user"
-    metadata: Optional[Dict[str, Any]] = None
+load_dotenv()
 
 
 class PerceptionOutput(BaseModel):
+    """Result of classifying a user's input."""
     structured_input: Dict[str, Any]
     intent: str
-    context: Dict[str, Any]
 
 
 class Perception:
+    """Classifies user input into one of six intent categories.
+
+    Uses the LLM for classification, with a keyword-based fallback
+    in case the LLM call fails.
+
+    Intent categories:
+        compliance_evaluation  — evaluate/audit compliance posture
+        document_query         — questions about uploaded company documents
+        information_seeking    — factual questions about standards/regulations
+        problem_solving        — analysis or reasoning tasks
+        planning               — requests for step-by-step procedures
+        general_query          — casual conversation or greetings
+    """
+
+    VALID_INTENTS = [
+        "compliance_evaluation",
+        "document_query",
+        "information_seeking",
+        "problem_solving",
+        "planning",
+        "general_query",
+    ]
+
     def __init__(self):
         self.logger = logger_instance.get_logger("perception")
-        load_dotenv()
         self.model_config = {
             "model": f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}",
-            "temperature": float(os.getenv('TEMPERATURE', '0.3')),
-            "max_tokens": int(os.getenv('MAX_TOKENS', '100'))
+            "temperature": 0.1,
+            "max_tokens": 20,
         }
 
-    def process_input(
-        self, raw_input: str, source: str = "user"
-    ) -> PerceptionOutput:
-        try:
-            self.logger.info(
-                f"Processing input from {source}: {raw_input[:100]}..."
-            )
+    def process_input(self, raw_input: str, source: str = "user") -> PerceptionOutput:
+        """Classify raw user input and return a structured PerceptionOutput."""
+        self.logger.info(f"Processing input from {source}: {raw_input[:100]}...")
 
-            perception_input = PerceptionInput(
-                content=raw_input, source=source
-            )
+        intent = self._detect_intent(raw_input)
 
-            intent = self._detect_intent(perception_input.content)
-            context = self._extract_context(perception_input.content)
+        output = PerceptionOutput(
+            structured_input={"original_content": raw_input, "source": source},
+            intent=intent,
+        )
 
-            structured_input = {
-                "original_content": perception_input.content,
-                "source": perception_input.source,
-                "metadata": perception_input.metadata or {},
-            }
-
-            output = PerceptionOutput(
-                structured_input=structured_input,
-                intent=intent,
-                context=context,
-            )
-
-            self.logger.info(f"Input processed. Intent: {intent}")
-            return output
-
-        except Exception as e:
-            self.logger.error(f"Error processing input: {e}")
-            raise
+        self.logger.info(f"Input processed. Intent: {intent}")
+        return output
 
     def _detect_intent(self, content: str) -> str:
+        """Classify intent via LLM, falling back to keyword matching on error."""
         try:
-            system_message = """Classify the user's request into one of these categories:
-
-- compliance_evaluation: Requests to evaluate, audit, or assess compliance, security posture, or governance
-- document_query: Questions about uploaded documents, policies, or company-specific content
-- information_seeking: Requests for facts, definitions, or research about regulations/standards
-- problem_solving: Requires reasoning, analysis, or solving problems
-- planning: Requests for step-by-step procedures or plans
-- general_query: Casual conversation or greetings
-
-Respond with only the category name."""
-
-            user_message = f"Classify this request: {content}"
+            system_message = (
+                "Classify the user's request into exactly one of these categories:\n\n"
+                "- compliance_evaluation: Requests to evaluate, audit, or assess "
+                "compliance, security posture, or governance\n"
+                "- document_query: Questions about uploaded documents, policies, "
+                "or company-specific content\n"
+                "- information_seeking: Requests for facts, definitions, or research "
+                "about regulations/standards\n"
+                "- problem_solving: Requires reasoning, analysis, or solving problems\n"
+                "- planning: Requests for step-by-step procedures or plans\n"
+                "- general_query: Casual conversation or greetings\n\n"
+                "Respond with only the category name."
+            )
 
             response = completion(
                 model=self.model_config["model"],
                 messages=[
                     {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message},
+                    {"role": "user", "content": f"Classify this request: {content}"},
                 ],
-                temperature=0.1,
-                max_tokens=20,
+                temperature=self.model_config["temperature"],
+                max_tokens=self.model_config["max_tokens"],
             )
 
             intent = response.choices[0].message.content.strip().lower()
-
-            valid_intents = [
-                "problem_solving",
-                "information_seeking",
-                "planning",
-                "general_query",
-                "compliance_evaluation",
-                "document_query",
-            ]
-            if intent in valid_intents:
-                return intent
-            else:
-                return self._fallback_intent_detection(content)
+            return intent if intent in self.VALID_INTENTS else self._fallback_intent_detection(content)
 
         except Exception as e:
-            self.logger.error(f"Error in LLM intent detection: {e}")
+            self.logger.error(f"LLM intent detection failed: {e}")
             return self._fallback_intent_detection(content)
 
     def _fallback_intent_detection(self, content: str) -> str:
+        """Keyword-based intent classification used when LLM is unavailable."""
         content_lower = content.lower()
 
         compliance_keywords = [
-            "compliance", "audit", "evaluate", "assessment",
-            "gap analysis", "iso 27001", "soc 2", "gdpr",
-            "hipaa", "pci dss", "nist", "cobit", "security posture",
-            "governance", "regulation", "standard",
+            "compliance", "audit", "evaluate", "assessment", "gap analysis",
+            "iso 27001", "soc 2", "gdpr", "hipaa", "pci dss", "nist", "cobit",
+            "security posture", "governance", "regulation", "standard",
         ]
         if any(kw in content_lower for kw in compliance_keywords):
             return "compliance_evaluation"
@@ -125,31 +113,11 @@ Respond with only the category name."""
         if any(kw in content_lower for kw in document_keywords):
             return "document_query"
 
-        if any(
-            word in content_lower
-            for word in ["search", "find", "what is", "who is", "define"]
-        ):
+        if any(w in content_lower for w in ["search", "find", "what is", "who is", "define"]):
             return "information_seeking"
-        elif any(
-            word in content_lower
-            for word in ["plan", "steps", "how to", "procedure"]
-        ):
+        if any(w in content_lower for w in ["plan", "steps", "how to", "procedure"]):
             return "planning"
-        elif any(
-            word in content_lower
-            for word in [
-                "how", "solve", "fix", "calculate", "determine",
-                "figure out",
-            ]
-        ):
+        if any(w in content_lower for w in ["how", "solve", "fix", "calculate", "determine", "figure out"]):
             return "problem_solving"
-        else:
-            return "general_query"
 
-    def _extract_context(self, content: str) -> Dict[str, Any]:
-        return {
-            "length": len(content),
-            "word_count": len(content.split()),
-            "has_numbers": any(char.isdigit() for char in content),
-            "has_questions": "?" in content,
-        }
+        return "general_query"

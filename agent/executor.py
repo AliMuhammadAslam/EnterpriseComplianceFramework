@@ -1,13 +1,9 @@
+import os
 from pydantic import BaseModel
 from litellm import completion
 from dotenv import load_dotenv
-import logging
-import os
 from typing import Dict, Any, List
 from utils.logger import logger_instance
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -20,340 +16,149 @@ class ExecutionResult(BaseModel):
 
 
 class Executor:
-    def __init__(self, modelName="gpt-4o", agentRole=""):
-        self.ModelName = ""
-        self.Role = agentRole + "\n"
-        if modelName.lower()[0:3] == "gpt":
-            self.ModelName = "openai/" + modelName
+    """Executes a Plan step by step using LLM reasoning.
 
+    Each step is processed by the LLM with the RAG context injected
+    into the system prompt, so responses are grounded in retrieved
+    regulatory and company document content.
+    """
+
+    def __init__(self, model_name: str = "gpt-4o"):
         self.logger = logger_instance.get_logger("executor")
         self.model_config = {
-            "model": f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}",
-            "temperature": float(os.getenv('TEMPERATURE', '0.3')),
-            "max_tokens": int(os.getenv('MAX_TOKENS', '4000'))
+            "model": f"openai/{os.getenv('DEFAULT_MODEL', model_name)}",
+            "temperature": float(os.getenv("TEMPERATURE", "0.3")),
+            "max_tokens": int(os.getenv("MAX_TOKENS", "4000")),
         }
 
     def execute_plan(
-        self,
-        plan,
-        tool_manager,
-        verbose: bool = False,
-        rag_context: str = "",
+        self, plan, verbose: bool = False, rag_context: str = ""
     ) -> ExecutionResult:
-        """Execute a plan step by step with RAG context available."""
+        """Execute each step of a plan sequentially.
+
+        Args:
+            plan: The Plan produced by the Planner.
+            verbose: If True, print step-by-step progress to stdout.
+            rag_context: Retrieved context to inject into every LLM call.
+
+        Returns:
+            ExecutionResult with the compiled final answer.
+        """
         self.logger.info(f"Executing plan with {len(plan.steps)} steps")
 
         step_results = []
         overall_success = True
-        final_result = None
 
-        try:
-            for step in plan.steps:
-                if verbose:
-                    print(
-                        f"[EXECUTOR] Executing step {step.step_number}: "
-                        f"{step.description}"
-                    )
+        for step in plan.steps:
+            if verbose:
+                print(f"[EXECUTOR] Step {step.step_number}: {step.description}")
 
-                self.logger.info(
-                    f"Executing step {step.step_number}: {step.description}"
-                )
+            self.logger.info(f"Executing step {step.step_number}: {step.description}")
 
-                if not self._check_dependencies(step, step_results):
-                    error_msg = (
-                        f"Dependencies not met for step {step.step_number}"
-                    )
-                    if verbose:
-                        print(f"[EXECUTOR] {error_msg}")
-                    self.logger.error(error_msg)
-                    step_results.append({
-                        "step_number": step.step_number,
-                        "success": False,
-                        "error": error_msg,
-                    })
-                    overall_success = False
-                    continue
+            if not self._dependencies_met(step, step_results):
+                error_msg = f"Dependencies not met for step {step.step_number}"
+                self.logger.error(error_msg)
+                step_results.append({"step_number": step.step_number, "success": False, "error": error_msg})
+                overall_success = False
+                continue
 
-                step_result = self._execute_step(
-                    step, tool_manager, step_results, verbose,
-                    rag_context=rag_context,
-                )
-                step_results.append(step_result)
-
-                if not step_result["success"]:
-                    overall_success = False
-                    if verbose:
-                        print(
-                            f"[EXECUTOR] Step {step.step_number} failed: "
-                            f"{step_result.get('error')}"
-                        )
-                    self.logger.error(
-                        f"Step {step.step_number} failed: "
-                        f"{step_result.get('error')}"
-                    )
-                else:
-                    if verbose:
-                        result_preview = str(step_result['result'])[:100]
-                        print(
-                            f"[EXECUTOR] Step {step.step_number} completed: "
-                            f"{result_preview}..."
-                        )
-                    self.logger.info(
-                        f"Step {step.step_number} completed successfully"
-                    )
-
-            final_result = self._compile_final_result(
-                step_results, plan.goal, rag_context=rag_context
-            )
+            result_text = self._execute_with_llm(step, step_results, rag_context)
+            step_results.append({"step_number": step.step_number, "success": True, "result": result_text})
 
             if verbose:
-                print("[EXECUTOR] Final result compiled")
+                print(f"[EXECUTOR] Step {step.step_number} complete: {result_text[:100]}...")
 
-            return ExecutionResult(
-                success=overall_success,
-                result=final_result,
-                step_results=step_results,
-            )
+            self.logger.info(f"Step {step.step_number} completed successfully")
 
-        except Exception as e:
-            error_msg = f"Error executing plan: {e}"
-            if verbose:
-                print(f"[EXECUTOR] {error_msg}")
-            self.logger.error(error_msg)
-            return ExecutionResult(
-                success=False,
-                result=None,
-                error=str(e),
-                step_results=step_results,
-            )
+        final_result = self._compile_final_result(step_results, plan.goal, rag_context)
 
-    def _execute_step(
-        self,
-        step,
-        tool_manager,
-        previous_results: List[Dict],
-        verbose: bool = False,
-        rag_context: str = "",
-    ) -> Dict[str, Any]:
-        try:
-            if step.tool_required:
-                if verbose:
-                    print(f"[EXECUTOR] Using tool: {step.tool_required}")
+        if verbose:
+            print("[EXECUTOR] Final result compiled")
 
-                tool_input = step.input_data or {}
-
-                tool_result = tool_manager.execute_tool(
-                    step.tool_required, tool_input
-                )
-
-                if tool_result.success:
-                    if verbose:
-                        print(
-                            f"[TOOL] {step.tool_required} succeeded: "
-                            f"{str(tool_result.result)[:100]}..."
-                        )
-                    return {
-                        "step_number": step.step_number,
-                        "success": True,
-                        "result": tool_result.result,
-                        "tool_used": step.tool_required,
-                    }
-                else:
-                    if verbose:
-                        print(
-                            f"[TOOL] {step.tool_required} failed: "
-                            f"{tool_result.error}"
-                        )
-                    # If the tool simply doesn't exist, fall back to LLM
-                    # rather than failing the step entirely
-                    if tool_result.error and "not found" in tool_result.error:
-                        self.logger.warning(
-                            f"Tool '{step.tool_required}' not found, "
-                            f"falling back to LLM reasoning"
-                        )
-                        if verbose:
-                            print(
-                                f"[EXECUTOR] Tool not found, "
-                                f"falling back to LLM reasoning"
-                            )
-                        llm_result = self._execute_with_llm(
-                            step, previous_results, rag_context=rag_context
-                        )
-                        return {
-                            "step_number": step.step_number,
-                            "success": True,
-                            "result": llm_result,
-                            "tool_used": None,
-                        }
-                    return {
-                        "step_number": step.step_number,
-                        "success": False,
-                        "error": tool_result.error,
-                        "tool_used": step.tool_required,
-                    }
-            else:
-                if verbose:
-                    print("[EXECUTOR] Using LLM reasoning for step")
-
-                llm_result = self._execute_with_llm(
-                    step, previous_results, rag_context=rag_context
-                )
-
-                if verbose:
-                    print(
-                        f"[LLM] Reasoning completed: "
-                        f"{str(llm_result)[:100]}..."
-                    )
-
-                return {
-                    "step_number": step.step_number,
-                    "success": True,
-                    "result": llm_result,
-                    "tool_used": None,
-                }
-
-        except Exception as e:
-            if verbose:
-                print(f"[EXECUTOR] Step execution error: {str(e)}")
-            return {
-                "step_number": step.step_number,
-                "success": False,
-                "error": str(e),
-            }
+        return ExecutionResult(
+            success=overall_success,
+            result=final_result,
+            step_results=step_results,
+        )
 
     def _execute_with_llm(
-        self,
-        step,
-        previous_results: List[Dict],
-        rag_context: str = "",
+        self, step, previous_results: List[Dict], rag_context: str = ""
     ) -> str:
-        """Execute a step using LLM reasoning with RAG context."""
-        context = ""
+        """Run a single plan step through the LLM with RAG context."""
+        prior_context = ""
         if previous_results:
-            context = "Previous results:\n"
-            for result in previous_results[-3:]:
-                if result["success"]:
-                    context += (
-                        f"Step {result['step_number']}: {result['result']}\n"
-                    )
+            prior_context = "Previous steps:\n"
+            for r in previous_results[-3:]:
+                if r.get("success"):
+                    prior_context += f"Step {r['step_number']}: {r['result']}\n"
 
-        # Inject RAG context for compliance-aware reasoning
         rag_section = ""
         if rag_context:
             rag_section = f"""
 RELEVANT REFERENCE MATERIAL:
 {rag_context}
 
-When answering, cite specific standards, clauses, or articles where applicable.
+Cite specific standards, clauses, or articles where applicable.
 """
 
-        system_message = f"""You are an AI assistant specializing in compliance, security, and governance advisory.
+        system_message = f"""You are an AI assistant specialising in compliance, security, and governance.
 
-You have access to a regulatory knowledge base and company documents. Use the provided reference material to give accurate, well-cited responses.
-
+Use the provided reference material to give accurate, well-cited responses.
 {rag_section}
-
-Provide clear, specific, and actionable results. If the problem requires calculation, show your work. If it requires analysis, explain your reasoning with references to specific standards or regulations where applicable."""
-
-        user_message = f"{context}\nSolve this problem: {step.description}"
+Provide clear, specific, and actionable results. Cite relevant standards or regulations where applicable."""
 
         try:
             response = completion(
                 model=self.model_config["model"],
                 messages=[
                     {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message},
+                    {"role": "user", "content": f"{prior_context}\nTask: {step.description}"},
                 ],
-                temperature=0.3,
+                temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
-            return f"Error solving problem with LLM: {str(e)}"
+            return f"Error executing step: {str(e)}"
 
-    def _check_dependencies(
-        self, step, completed_steps: List[Dict]
-    ) -> bool:
+    def _dependencies_met(self, step, completed_steps: List[Dict]) -> bool:
+        """Return True if all declared dependencies have completed successfully."""
         if not step.dependencies:
             return True
-
-        completed_step_numbers = {
-            result["step_number"]
-            for result in completed_steps
-            if result["success"]
-        }
-
-        return all(
-            dep in completed_step_numbers for dep in step.dependencies
-        )
+        completed = {r["step_number"] for r in completed_steps if r.get("success")}
+        return all(dep in completed for dep in step.dependencies)
 
     def _compile_final_result(
-        self,
-        step_results: List[Dict],
-        goal: str,
-        rag_context: str = "",
+        self, step_results: List[Dict], goal: str, rag_context: str = ""
     ) -> str:
-        """Compile final result with RAG-aware summarization."""
-        successful_results = [
-            result
-            for result in step_results
-            if result["success"] and result.get("result")
-        ]
+        """Summarise all step outputs into a single coherent answer."""
+        successful = [r for r in step_results if r.get("success") and r.get("result")]
 
-        if not successful_results:
+        if not successful:
             return "I was unable to complete the requested task."
 
-        all_data = ""
-        for result in successful_results:
-            step_result = result["result"]
-            if isinstance(step_result, list):
-                for item in step_result:
-                    if isinstance(item, dict):
-                        title = item.get('title', '')
-                        snippet = item.get('snippet', '')
-                        if title and snippet:
-                            all_data += f"{title}: {snippet}\n"
-            else:
-                all_data += f"{step_result}\n"
+        all_data = "\n".join(str(r["result"]) for r in successful)
 
-        # Build RAG-aware summarization prompt
-        rag_section = ""
-        if rag_context:
-            rag_section = f"""
-REFERENCE MATERIAL:
-{rag_context}
-"""
+        rag_section = f"\nREFERENCE MATERIAL:\n{rag_context}\n" if rag_context else ""
 
-        try:
-            system_message = f"""You are a compliance and governance specialist summarizing analysis results.
-
+        system_message = f"""You are a compliance and governance specialist summarising analysis results.
 {rag_section}
-
-Create a clear, comprehensive answer that directly addresses what the user asked for.
+Write a clear, comprehensive answer that directly addresses what the user asked.
 - For compliance/regulatory questions: cite specific standards, clauses, and articles
-- For general questions: focus on key facts and information
-- Structure your response with clear sections if appropriate
+- Structure your response with clear sections where appropriate
 - Do not mention internal processing steps"""
 
-            user_message = f"""Original question: {goal}
-
-Analysis results and data:
-{all_data}
-
-Provide a direct, informative answer to the user's question."""
-
+        try:
             response = completion(
                 model=self.model_config["model"],
                 messages=[
                     {"role": "system", "content": system_message},
-                    {"role": "user", "content": user_message},
+                    {"role": "user", "content": f"Question: {goal}\n\nAnalysis:\n{all_data}\n\nProvide a direct, informative answer."},
                 ],
-                temperature=0.3,
+                temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
             )
-
             return response.choices[0].message.content.strip()
-
         except Exception as e:
-            self.logger.error(f"Error creating summary: {e}")
+            self.logger.error(f"Error compiling final result: {e}")
             return f"Based on the analysis: {all_data[:500]}..."

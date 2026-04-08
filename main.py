@@ -85,8 +85,6 @@ class AgentCLI:
         
         print("\nSystem Status:")
         print(f"   Model: {status['configuration']['model']}")
-        print(f"   Available Tools: "
-              f"{', '.join(status['components']['tool_manager']['tools'])}")
         print(f"   Memory Entries: "
               f"{status['components']['memory']['short_term_entries']} "
               f"short-term, "
