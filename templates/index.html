@@ -3,138 +3,223 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Compliance Agent</title>
+    <title>ComplianceAI — Enterprise Compliance Framework</title>
+    <meta name="description" content="AI-powered compliance evaluation platform for fintech organizations. Evaluate security posture against ISO 27001, SOC 2, GDPR, NIST, PCI DSS, and more.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --bg-surface: #ffffff;
+            --bg-surface-alt: #f8fafc;
+            --bg-hover: #f1f5f9;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --accent-light: rgba(59, 130, 246, 0.1);
+            --success: #10b981;
+            --success-light: rgba(16, 185, 129, 0.1);
+            --warning: #f59e0b;
+            --warning-light: rgba(245, 158, 11, 0.1);
+            --error: #ef4444;
+            --error-light: rgba(239, 68, 68, 0.1);
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --text-inverse: #f8fafc;
+            --border: #e2e8f0;
+            --border-light: #f1f5f9;
+            --shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --transition: 0.2s ease;
+            --sidebar-width: 360px;
         }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f5f5f5;
-            color: #333;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-surface-alt);
+            color: var(--text-primary);
             height: 100vh;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .header {
-            background-color: #1a2332;
-            color: white;
-            padding: 0.75rem 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .header h1 {
-            font-size: 1.2rem;
-        }
-
-        .header-status {
-            display: flex;
-            gap: 1rem;
-            font-size: 0.8rem;
-            opacity: 0.8;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 4px;
-        }
-
-        .status-dot.active { background-color: #2ecc71; }
-        .status-dot.inactive { background-color: #e74c3c; }
-
-        .main-content {
-            flex: 1;
-            display: flex;
-            gap: 1rem;
-            padding: 1rem;
             overflow: hidden;
         }
 
-        .chat-section {
-            flex: 2;
+        /* ---- Layout ---- */
+        .app-layout {
             display: flex;
-            flex-direction: column;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            height: 100vh;
         }
 
+        /* ---- Sidebar ---- */
         .sidebar {
-            flex: 1;
+            width: var(--sidebar-width);
+            min-width: var(--sidebar-width);
+            background: var(--bg-primary);
+            color: var(--text-inverse);
             display: flex;
             flex-direction: column;
+            transition: transform var(--transition);
+            z-index: 50;
+        }
+
+        .sidebar-header {
+            padding: 1.25rem 1.25rem 1rem;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            margin-bottom: 0.6rem;
+        }
+
+        .sidebar-brand .logo {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1rem;
+        }
+
+        .sidebar-brand h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        .sidebar-brand span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+        }
+
+        .sidebar-status {
+            display: flex;
             gap: 0.75rem;
-            max-width: 380px;
+            font-size: 0.72rem;
+            color: var(--text-muted);
         }
 
-        .panel {
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            padding: 0.75rem;
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
         }
 
-        .panel h3 {
-            font-size: 0.9rem;
-            margin-bottom: 0.5rem;
-            color: #1a2332;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 0.4rem;
+        .status-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+            background: var(--success);
+            box-shadow: 0 0 6px rgba(16, 185, 129, 0.5);
         }
 
-        /* Upload Panel */
+        .status-dot.inactive {
+            background: var(--error);
+            box-shadow: 0 0 6px rgba(239, 68, 68, 0.5);
+        }
+
+        /* ---- Sidebar Panels ---- */
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0.5rem 0;
+        }
+
+        .sidebar-content::-webkit-scrollbar { width: 4px; }
+        .sidebar-content::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
+
+        .panel-section {
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .panel-toggle {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.25rem;
+            background: none;
+            border: none;
+            color: var(--text-inverse);
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+
+        .panel-toggle:hover { background: rgba(255,255,255,0.04); }
+
+        .panel-toggle .toggle-icon {
+            font-size: 0.65rem;
+            transition: transform var(--transition);
+            color: var(--text-muted);
+        }
+
+        .panel-toggle[aria-expanded="true"] .toggle-icon { transform: rotate(90deg); }
+
+        .panel-body {
+            padding: 0 1.25rem 0.75rem;
+            display: none;
+        }
+
+        .panel-body.open { display: block; animation: fadeSlideDown 0.2s ease; }
+
+        @keyframes fadeSlideDown {
+            from { opacity: 0; transform: translateY(-6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Upload area */
         .upload-area {
-            border: 2px dashed #bdc3c7;
-            border-radius: 6px;
-            padding: 1rem;
+            border: 1.5px dashed rgba(255,255,255,0.15);
+            border-radius: var(--radius-sm);
+            padding: 0.85rem;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all var(--transition);
             margin-bottom: 0.5rem;
         }
 
         .upload-area:hover, .upload-area.drag-over {
-            border-color: #3498db;
-            background-color: #f0f8ff;
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.08);
         }
 
-        .upload-area p {
-            font-size: 0.85rem;
-            color: #7f8c8d;
-        }
+        .upload-area p { font-size: 0.78rem; color: var(--text-muted); }
+        .upload-area .format-hint { font-size: 0.68rem; color: rgba(255,255,255,0.3); margin-top: 0.2rem; }
 
-        .upload-area .format-hint {
+        .upload-progress {
+            display: none;
             font-size: 0.75rem;
-            color: #95a5a6;
-            margin-top: 0.3rem;
+            padding: 0.4rem 0.6rem;
+            border-radius: var(--radius-sm);
+            margin-bottom: 0.5rem;
         }
 
-        .doc-list {
-            max-height: 120px;
-            overflow-y: auto;
-            font-size: 0.8rem;
-        }
+        .upload-progress.show { display: block; }
+        .upload-progress.success { background: var(--success-light); color: var(--success); }
+        .upload-progress.error { background: var(--error-light); color: var(--error); }
+        .upload-progress.loading { background: var(--accent-light); color: var(--accent); }
+
+        .doc-list { max-height: 140px; overflow-y: auto; }
 
         .doc-item {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 0.3rem 0;
-            border-bottom: 1px solid #f0f0f0;
+            justify-content: space-between;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.75rem;
         }
 
         .doc-item .doc-name {
@@ -142,254 +227,865 @@
             overflow: hidden;
             text-overflow: ellipsis;
             white-space: nowrap;
+            color: rgba(255,255,255,0.8);
         }
 
-        .doc-item .doc-chunks {
-            color: #95a5a6;
-            font-size: 0.75rem;
-            margin-left: 0.5rem;
-        }
+        .doc-item .doc-meta { color: var(--text-muted); font-size: 0.68rem; margin-left: 0.5rem; }
 
         .doc-item .delete-btn {
-            background: none;
-            border: none;
-            color: #e74c3c;
-            cursor: pointer;
-            font-size: 0.8rem;
-            margin-left: 0.5rem;
+            background: none; border: none;
+            color: rgba(239,68,68,0.6); cursor: pointer;
+            font-size: 0.75rem; margin-left: 0.4rem;
+            transition: color var(--transition);
         }
 
-        /* Evaluation Panel */
+        .doc-item .delete-btn:hover { color: var(--error); }
+
+        /* Evaluation form */
         .eval-form {
             display: flex;
             flex-direction: column;
-            gap: 0.4rem;
-        }
-
-        .eval-form label {
-            font-size: 0.8rem;
-            color: #555;
-        }
-
-        .eval-form input, .eval-form select {
-            padding: 0.4rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 0.85rem;
-        }
-
-        .eval-btn {
-            padding: 0.5rem;
-            background-color: #27ae60;
-            color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 0.85rem;
-            margin-top: 0.3rem;
-        }
-
-        .eval-btn:hover { background-color: #219a52; }
-        .eval-btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-
-        /* Chat */
-        .chat-messages {
-            flex: 1;
-            overflow-y: auto;
-            padding: 1rem;
-            border-bottom: 1px solid #eee;
-        }
-
-        .message {
-            margin-bottom: 1rem;
-            padding: 0.75rem;
-            border-radius: 8px;
-            max-width: 85%;
-            font-size: 0.9rem;
-            line-height: 1.5;
-        }
-
-        .user-message {
-            background-color: #3498db;
-            color: white;
-            margin-left: auto;
-        }
-
-        .agent-message {
-            background-color: #ecf0f1;
-            color: #2c3e50;
-        }
-
-        .agent-message pre {
-            background-color: #dfe6e9;
-            padding: 0.5rem;
-            border-radius: 4px;
-            overflow-x: auto;
-            font-size: 0.82rem;
-            margin-top: 0.5rem;
-        }
-
-        .chat-input {
-            padding: 0.75rem;
-            display: flex;
             gap: 0.5rem;
         }
 
-        .chat-input input {
-            flex: 1;
-            padding: 0.6rem;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 0.9rem;
+        .eval-form label { font-size: 0.72rem; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        .eval-form input, .eval-form select {
+            padding: 0.5rem 0.6rem;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius-sm);
+            color: var(--text-inverse);
+            font-family: inherit;
+            font-size: 0.82rem;
+            transition: border-color var(--transition);
         }
 
-        .chat-input button {
-            padding: 0.6rem 1.2rem;
-            background-color: #3498db;
+        .eval-form input:focus, .eval-form select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .eval-form input::placeholder { color: rgba(255,255,255,0.25); }
+
+        .standards-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.25rem 0.5rem;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+
+        .std-check {
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.7);
+            cursor: pointer;
+        }
+
+        .std-check input[type="checkbox"] {
+            accent-color: var(--accent);
+            width: 14px; height: 14px;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            padding: 0.55rem 1rem;
+            background: linear-gradient(135deg, var(--accent), #6366f1);
             color: white;
             border: none;
-            border-radius: 4px;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
             cursor: pointer;
-            font-size: 0.9rem;
+            transition: all var(--transition);
         }
 
-        .chat-input button:hover { background-color: #2980b9; }
-        .chat-input button:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+        .btn-primary:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
 
-        /* Logs */
-        .logs-content {
-            max-height: 150px;
-            overflow-y: auto;
-            background-color: #1a2332;
-            color: #ecf0f1;
-            padding: 0.5rem;
-            font-family: 'Courier New', monospace;
-            font-size: 0.75rem;
-            border-radius: 4px;
+        .btn-success {
+            padding: 0.55rem 1rem;
+            background: linear-gradient(135deg, var(--success), #059669);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition);
         }
 
-        .log-entry { margin-bottom: 0.15rem; word-wrap: break-word; }
+        .btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
 
-        .upload-progress {
+        /* Audit log panel */
+        .audit-log-list { max-height: 200px; overflow-y: auto; }
+
+        .audit-entry {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.7rem;
+        }
+
+        .audit-entry .audit-time { color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 55px; }
+        .audit-entry .audit-action { font-weight: 500; color: rgba(255,255,255,0.8); }
+        .audit-entry .audit-user { color: var(--accent); }
+
+        .audit-badge {
+            display: inline-block;
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.62rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .audit-badge.success { background: var(--success-light); color: var(--success); }
+        .audit-badge.failure { background: var(--error-light); color: var(--error); }
+
+        /* KB Standards list */
+        .standards-list { max-height: 200px; overflow-y: auto; }
+
+        .standard-item {
+            padding: 0.35rem 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            font-size: 0.73rem;
+            color: rgba(255,255,255,0.75);
+        }
+
+        .standard-item .std-title { font-weight: 500; }
+        .standard-item .std-file { color: var(--text-muted); font-size: 0.65rem; }
+
+        /* Session bar */
+        .session-bar {
+            padding: 0.75rem 1.25rem;
+            border-top: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .session-bar label { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; }
+
+        .session-bar input {
+            flex: 1;
+            padding: 0.35rem 0.5rem;
+            background: var(--bg-secondary);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius-sm);
+            color: var(--text-inverse);
+            font-family: inherit;
+            font-size: 0.78rem;
+        }
+
+        .session-bar input:focus { outline: none; border-color: var(--accent); }
+
+        /* ---- Main Content ---- */
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        /* Top bar */
+        .top-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem 1.5rem;
+            background: var(--bg-surface);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .top-bar-left { display: flex; align-items: center; gap: 1rem; }
+
+        .menu-btn {
             display: none;
-            font-size: 0.8rem;
-            color: #3498db;
+            background: none;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 0.4rem 0.6rem;
+            font-size: 1rem;
+            cursor: pointer;
+            color: var(--text-secondary);
+        }
+
+        .top-bar h2 {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .top-bar-right { display: flex; align-items: center; gap: 0.75rem; font-size: 0.75rem; color: var(--text-muted); }
+
+        .health-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.3rem 0.65rem;
+            background: var(--bg-surface-alt);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            font-size: 0.7rem;
+        }
+
+        /* ---- Chat Area ---- */
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem 1.5rem;
+        }
+
+        .chat-messages::-webkit-scrollbar { width: 5px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .message {
+            max-width: 82%;
+            margin-bottom: 1rem;
+            animation: messageIn 0.25s ease;
+        }
+
+        @keyframes messageIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-message {
+            margin-left: auto;
+        }
+
+        .user-message .msg-bubble {
+            background: linear-gradient(135deg, var(--accent), #6366f1);
+            color: white;
+            padding: 0.75rem 1rem;
+            border-radius: var(--radius-md) var(--radius-md) 4px var(--radius-md);
+            font-size: 0.88rem;
+            line-height: 1.55;
+        }
+
+        .agent-message .msg-bubble {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            padding: 0.85rem 1rem;
+            border-radius: var(--radius-md) var(--radius-md) var(--radius-md) 4px;
+            font-size: 0.88rem;
+            line-height: 1.65;
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .msg-header {
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-bottom: 0.3rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .user-message .msg-header { text-align: right; }
+
+        .msg-time {
+            font-size: 0.65rem;
+            color: var(--text-muted);
             margin-top: 0.3rem;
         }
 
-        @media (max-width: 768px) {
-            .main-content { flex-direction: column; }
-            .chat-section { height: 50vh; }
-            .sidebar { max-width: 100%; height: 50vh; overflow-y: auto; }
+        .user-message .msg-time { text-align: right; }
+
+        /* Markdown rendering in agent messages */
+        .agent-message .msg-bubble h1 { font-size: 1.2rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
+        .agent-message .msg-bubble h2 { font-size: 1.05rem; font-weight: 700; margin: 0.5rem 0 0.3rem; color: var(--accent); }
+        .agent-message .msg-bubble h3 { font-size: 0.92rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
+        .agent-message .msg-bubble p { margin: 0.3rem 0; }
+        .agent-message .msg-bubble ul, .agent-message .msg-bubble ol { padding-left: 1.3rem; margin: 0.3rem 0; }
+        .agent-message .msg-bubble li { margin-bottom: 0.15rem; }
+        .agent-message .msg-bubble strong { font-weight: 600; }
+
+        .agent-message .msg-bubble pre {
+            background: var(--bg-primary);
+            color: #e2e8f0;
+            padding: 0.75rem 0.85rem;
+            border-radius: var(--radius-sm);
+            overflow-x: auto;
+            font-size: 0.8rem;
+            margin: 0.4rem 0;
+            font-family: 'Fira Code', 'Consolas', monospace;
+        }
+
+        .agent-message .msg-bubble code:not(pre code) {
+            background: var(--bg-surface-alt);
+            padding: 0.1rem 0.35rem;
+            border-radius: 3px;
+            font-size: 0.82rem;
+            color: var(--accent-hover);
+        }
+
+        .agent-message .msg-bubble table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 0.5rem 0;
+            font-size: 0.82rem;
+        }
+
+        .agent-message .msg-bubble th, .agent-message .msg-bubble td {
+            border: 1px solid var(--border);
+            padding: 0.4rem 0.6rem;
+            text-align: left;
+        }
+
+        .agent-message .msg-bubble th {
+            background: var(--bg-surface-alt);
+            font-weight: 600;
+        }
+
+        .agent-message .msg-bubble blockquote {
+            border-left: 3px solid var(--accent);
+            padding-left: 0.75rem;
+            margin: 0.4rem 0;
+            color: var(--text-secondary);
+            font-style: italic;
+        }
+
+        /* Typing indicator */
+        .typing-indicator {
+            display: none;
+            padding: 0 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .typing-indicator.show { display: block; }
+
+        .typing-dots {
+            display: inline-flex;
+            gap: 4px;
+            padding: 0.6rem 0.8rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+        }
+
+        .typing-dots span {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            animation: typingBounce 1.4s ease infinite;
+        }
+
+        .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+        @keyframes typingBounce {
+            0%, 60%, 100% { transform: translateY(0); }
+            30% { transform: translateY(-5px); }
+        }
+
+        /* Chat input */
+        .chat-input-container {
+            padding: 0.85rem 1.5rem;
+            background: var(--bg-surface);
+            border-top: 1px solid var(--border);
+        }
+
+        .chat-input-wrapper {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            background: var(--bg-surface-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            padding: 0.35rem 0.5rem;
+            transition: border-color var(--transition);
+        }
+
+        .chat-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+
+        .chat-input-wrapper input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 0.55rem 0.5rem;
+            font-family: inherit;
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+
+        .chat-input-wrapper input:focus { outline: none; }
+        .chat-input-wrapper input::placeholder { color: var(--text-muted); }
+
+        .send-btn {
+            width: 38px; height: 38px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), #6366f1);
+            color: white;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+            transition: all var(--transition);
+            flex-shrink: 0;
+        }
+
+        .send-btn:hover { transform: scale(1.05); filter: brightness(1.1); }
+        .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; filter: none; }
+
+        /* ---- Toast Notifications ---- */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .toast {
+            padding: 0.65rem 1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.8rem;
+            font-weight: 500;
+            box-shadow: var(--shadow-lg);
+            animation: toastIn 0.3s ease, toastOut 0.3s ease 3.7s forwards;
+            max-width: 320px;
+        }
+
+        .toast.success { background: var(--success); color: white; }
+        .toast.error { background: var(--error); color: white; }
+        .toast.info { background: var(--accent); color: white; }
+
+        @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
+
+        /* ---- Logs panel (bottom bar) ---- */
+        .logs-bar {
+            background: var(--bg-primary);
+            border-top: 1px solid rgba(255,255,255,0.06);
+            transition: height var(--transition);
+            overflow: hidden;
+        }
+
+        .logs-bar.collapsed { height: 36px; }
+        .logs-bar.expanded { height: 180px; }
+
+        .logs-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.45rem 1.5rem;
+            cursor: pointer;
+        }
+
+        .logs-header span {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .logs-header button {
+            background: none; border: none;
+            color: var(--text-muted); cursor: pointer;
+            font-size: 0.7rem;
+        }
+
+        .logs-content {
+            padding: 0 1.5rem 0.5rem;
+            overflow-y: auto;
+            height: calc(100% - 36px);
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.6);
+        }
+
+        .log-entry { padding: 0.1rem 0; }
+        .log-entry .log-time { color: var(--accent); }
+
+        /* ---- Responsive ---- */
+        @media (max-width: 900px) {
+            .sidebar {
+                position: fixed;
+                left: 0; top: 0; bottom: 0;
+                transform: translateX(-100%);
+            }
+
+            .sidebar.open { transform: translateX(0); }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 40;
+            }
+
+            .sidebar-overlay.show { display: block; }
+
+            .menu-btn { display: flex; }
+
+            .message { max-width: 95%; }
+        }
+
+        /* ---- Skeleton loader ---- */
+        .skeleton {
+            background: linear-gradient(90deg, var(--border-light) 25%, var(--border) 50%, var(--border-light) 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: var(--radius-sm);
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🛡️ Compliance Agent</h1>
-            <div class="header-status">
-                <span><span class="status-dot active" id="kbDot"></span>KB: <span id="kbStatus">Loading...</span></span>
-                <span>Strategy: Plan & Execute + RAG</span>
-            </div>
-        </div>
+    <div class="app-layout">
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
-        <div class="main-content">
-            <div class="chat-section">
-                <div class="chat-messages" id="chatMessages">
-                    <div class="message agent-message">
-                        <strong>Agent:</strong> Welcome! I'm a compliance and governance assistant powered by a regulatory knowledge base (ISO 27001, SOC 2, GDPR, NIST, HIPAA, PCI DSS, COBIT).<br><br>
-                        You can:<br>
-                        • Ask questions about compliance standards<br>
-                        • Upload your company documents (PDF, DOCX, TXT)<br>
-                        • Run a compliance evaluation against your documents
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-brand">
+                    <div class="logo">🛡️</div>
+                    <div>
+                        <h1>ComplianceAI</h1>
+                        <span>Enterprise Framework</span>
                     </div>
                 </div>
-
-                <div class="chat-input">
-                    <input type="text" id="messageInput" placeholder="Ask about compliance, standards, or your documents..." onkeypress="handleKeyPress(event)">
-                    <button onclick="sendMessage()" id="sendButton">Send</button>
+                <div class="sidebar-status">
+                    <div class="status-indicator">
+                        <div class="status-dot" id="kbDot"></div>
+                        <span>KB: <span id="kbChunks">...</span></span>
+                    </div>
+                    <div class="status-indicator">
+                        <div class="status-dot"></div>
+                        <span>Plan & Execute + RAG</span>
+                    </div>
                 </div>
             </div>
 
-            <div class="sidebar">
-                <!-- Document Upload Panel -->
-                <div class="panel">
-                    <h3>📄 Company Documents</h3>
-                    <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
-                        <p>Drop files here or click to upload</p>
-                        <p class="format-hint">PDF, DOCX, TXT (max 50MB)</p>
+            <div class="sidebar-content">
+                <!-- Documents Panel -->
+                <div class="panel-section">
+                    <button class="panel-toggle" aria-expanded="true" onclick="togglePanel(this)">
+                        📄 Company Documents
+                        <span class="toggle-icon">▸</span>
+                    </button>
+                    <div class="panel-body open" id="docPanel">
+                        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                            <p>Drop files here or click to upload</p>
+                            <p class="format-hint">PDF, DOCX, TXT (max 50 MB)</p>
+                        </div>
+                        <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.txt" onchange="uploadFile(this)">
+                        <div class="upload-progress" id="uploadProgress"></div>
+                        <div class="doc-list" id="docList"></div>
                     </div>
-                    <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.txt" onchange="uploadFile(this)">
-                    <div class="upload-progress" id="uploadProgress">Uploading...</div>
-                    <div class="doc-list" id="docList"></div>
                 </div>
 
                 <!-- Evaluation Panel -->
-                <div class="panel">
-                    <h3>📊 Compliance Evaluation</h3>
-                    <div class="eval-form">
-                        <label>Industry</label>
-                        <input type="text" id="evalIndustry" placeholder="e.g., Fintech">
-                        <label>Country</label>
-                        <input type="text" id="evalCountry" placeholder="e.g., Pakistan">
-                        <button class="eval-btn" onclick="runEvaluation()" id="evalButton">
-                            Run Evaluation
+                <div class="panel-section">
+                    <button class="panel-toggle" aria-expanded="true" onclick="togglePanel(this)">
+                        📊 Compliance Evaluation
+                        <span class="toggle-icon">▸</span>
+                    </button>
+                    <div class="panel-body open" id="evalPanel">
+                        <div class="eval-form">
+                            <label>Standards to Evaluate</label>
+                            <div class="standards-grid" id="standardsGrid"></div>
+                            <button class="btn-success" onclick="runEvaluation()" id="evalButton">
+                                Run Compliance Evaluation
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Report History Panel -->
+                <div class="panel-section">
+                    <button class="panel-toggle" aria-expanded="false" onclick="togglePanel(this)">
+                        📑 Report History
+                        <span class="toggle-icon">▸</span>
+                    </button>
+                    <div class="panel-body" id="reportPanel">
+                        <div id="reportList" style="font-size:0.75rem; color: var(--text-muted);">No reports yet</div>
+                    </div>
+                </div>
+
+                <!-- Audit Trail Panel -->
+                <div class="panel-section">
+                    <button class="panel-toggle" aria-expanded="false" onclick="togglePanel(this)">
+                        🔍 Audit Trail
+                        <span class="toggle-icon">▸</span>
+                    </button>
+                    <div class="panel-body" id="auditPanel">
+                        <div class="audit-log-list" id="auditLogList">
+                            <div style="font-size:0.75rem; color: var(--text-muted);">Loading...</div>
+                        </div>
+                        <button class="btn-primary" style="margin-top:0.5rem; width:100%; font-size:0.72rem;" onclick="exportAudit()">
+                            Export Audit Log (CSV)
                         </button>
                     </div>
                 </div>
 
-                <!-- Logs Panel -->
-                <div class="panel" style="flex:1; display:flex; flex-direction:column;">
-                    <h3>📋 Execution Logs</h3>
-                    <div class="logs-content" id="logsContent">
-                        <div class="log-entry">Ready.</div>
+                <!-- Knowledge Base Panel -->
+                <div class="panel-section">
+                    <button class="panel-toggle" aria-expanded="false" onclick="togglePanel(this)">
+                        📚 Knowledge Base
+                        <span class="toggle-icon">▸</span>
+                    </button>
+                    <div class="panel-body" id="kbPanel">
+                        <div class="standards-list" id="kbStandardsList">
+                            <div style="font-size:0.75rem; color: var(--text-muted);">Loading...</div>
+                        </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Session Bar -->
+            <div class="session-bar">
+                <label>User:</label>
+                <select id="userIdInput" onchange="onUserIdChange()">
+                    <option value="default">default</option>
+                    <option value="analyst">analyst</option>
+                    <option value="auditor">auditor</option>
+                    <option value="admin">admin</option>
+                </select>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <div class="main-content">
+            <div class="top-bar">
+                <div class="top-bar-left">
+                    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+                    <h2>Compliance Assistant</h2>
+                </div>
+                <div class="top-bar-right">
+                    <div class="health-pill">
+                        <div class="status-dot"></div>
+                        <span id="healthModel">GPT-4o</span>
+                    </div>
+                    <div class="health-pill">
+                        📄 <span id="healthDocs">0</span> docs
+                    </div>
+                    <button onclick="resetSession()" style="background:none; border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; color:var(--text-secondary);">
+                        Reset Session
+                    </button>
+                </div>
+            </div>
+
+            <div class="chat-container">
+                <div class="chat-messages" id="chatMessages">
+                    <div class="message agent-message">
+                        <div class="msg-header">Agent</div>
+                        <div class="msg-bubble">
+                            <p>Welcome to <strong>ComplianceAI</strong> — your enterprise compliance and governance assistant.</p>
+                            <p>I'm backed by a regulatory knowledge base covering <strong>18 standards</strong> including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, COBIT, SBP regulations, SECP guidelines, FATF, Basel III/IV, and more.</p>
+                            <p>You can:</p>
+                            <ul>
+                                <li>Ask compliance and regulatory questions</li>
+                                <li>Upload company documents (PDF, DOCX, TXT)</li>
+                                <li>Run a structured compliance evaluation against your documents</li>
+                                <li>View evaluation report history</li>
+                            </ul>
+                        </div>
+                        <div class="msg-time">System</div>
+                    </div>
+                </div>
+
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="typing-dots"><span></span><span></span><span></span></div>
+                </div>
+
+                <div class="chat-input-container">
+                    <div class="chat-input-wrapper">
+                        <input type="text" id="messageInput" placeholder="Ask about compliance standards, regulations, or your documents..." onkeypress="handleKeyPress(event)">
+                        <button class="send-btn" onclick="sendMessage()" id="sendButton" title="Send message">➤</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Logs Bar -->
+            <div class="logs-bar collapsed" id="logsBar">
+                <div class="logs-header" onclick="toggleLogs()">
+                    <span>📋 Execution Logs</span>
+                    <button id="logsToggleBtn">▲</button>
+                </div>
+                <div class="logs-content" id="logsContent">
+                    <div class="log-entry">Ready.</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script>
-        const USER_ID = 'default';
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
 
-        // Initialize
+    <script>
+        // ------------------------------------------------------------------
+        // State
+        // ------------------------------------------------------------------
+        let USER_ID = 'default';
+
+        // Default-checked standards for fintech / Pakistan context
+        const DEFAULT_CHECKED_STANDARDS = [
+            'ISO 27001', 'SOC 2', 'GDPR', 'NIST CSF', 'PCI DSS',
+            'SBP Regulations', 'FATF', 'SECP Guidelines', 'Pakistan AML/CFT',
+        ];
+
+        // ------------------------------------------------------------------
+        // Init
+        // ------------------------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
             loadKBStatus();
             loadDocuments();
+            loadKBStandards();
+            loadAuditLogs();
+            loadReports();
             setupDragDrop();
+            loadStandardsGrid();
+            loadModelName();
         });
 
-        function setupDragDrop() {
-            const area = document.getElementById('uploadArea');
-            ['dragenter', 'dragover'].forEach(e => {
-                area.addEventListener(e, (ev) => { ev.preventDefault(); area.classList.add('drag-over'); });
-            });
-            ['dragleave', 'drop'].forEach(e => {
-                area.addEventListener(e, (ev) => { ev.preventDefault(); area.classList.remove('drag-over'); });
-            });
-            area.addEventListener('drop', (e) => {
-                const files = e.dataTransfer.files;
-                if (files.length > 0) uploadFileObj(files[0]);
-            });
+        // ------------------------------------------------------------------
+        // Sidebar & Panels
+        // ------------------------------------------------------------------
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('show');
         }
 
+        function togglePanel(btn) {
+            const expanded = btn.getAttribute('aria-expanded') === 'true';
+            btn.setAttribute('aria-expanded', !expanded);
+            const body = btn.nextElementSibling;
+            body.classList.toggle('open');
+        }
+
+        function toggleLogs() {
+            const bar = document.getElementById('logsBar');
+            const btn = document.getElementById('logsToggleBtn');
+            if (bar.classList.contains('collapsed')) {
+                bar.classList.remove('collapsed');
+                bar.classList.add('expanded');
+                btn.textContent = '▼';
+            } else {
+                bar.classList.remove('expanded');
+                bar.classList.add('collapsed');
+                btn.textContent = '▲';
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Standards Grid (populated dynamically from /knowledge/standards)
+        // ------------------------------------------------------------------
+        async function loadStandardsGrid() {
+            const grid = document.getElementById('standardsGrid');
+            try {
+                const res = await fetch('/knowledge/standards');
+                const data = await res.json();
+                const standards = (data.standards || []).map(s => s.title);
+                grid.innerHTML = '';
+                standards.forEach(std => {
+                    const checked = DEFAULT_CHECKED_STANDARDS.includes(std);
+                    const label = document.createElement('label');
+                    label.className = 'std-check';
+                    label.innerHTML = `<input type="checkbox" value="${std}" ${checked ? 'checked' : ''}> ${std}`;
+                    grid.appendChild(label);
+                });
+            } catch (e) {
+                grid.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">Failed to load standards</div>';
+            }
+        }
+
+        async function loadModelName() {
+            try {
+                const res = await fetch('/status');
+                const data = await res.json();
+                const model = data.configuration?.model || 'GPT-4o';
+                document.getElementById('healthModel').textContent = model;
+            } catch (e) { /* keep default text */ }
+        }
+
+        function getSelectedStandards() {
+            const boxes = document.querySelectorAll('#standardsGrid input[type="checkbox"]:checked');
+            return Array.from(boxes).map(cb => cb.value);
+        }
+
+        // ------------------------------------------------------------------
+        // User ID
+        // ------------------------------------------------------------------
+        function onUserIdChange() {
+            USER_ID = document.getElementById('userIdInput').value;
+            loadDocuments();
+            loadReports();
+            showToast(`Switched to user: ${USER_ID}`, 'info');
+        }
+
+        // ------------------------------------------------------------------
+        // KB Status & Standards
+        // ------------------------------------------------------------------
         async function loadKBStatus() {
             try {
                 const res = await fetch('/knowledge/status');
                 const data = await res.json();
                 const dot = document.getElementById('kbDot');
-                const status = document.getElementById('kbStatus');
-                if (data.populated) {
-                    dot.className = 'status-dot active';
-                    status.textContent = `${data.document_count} chunks`;
-                } else {
-                    dot.className = 'status-dot inactive';
-                    status.textContent = 'Empty';
-                }
+                dot.className = data.populated ? 'status-dot' : 'status-dot inactive';
+                document.getElementById('kbChunks').textContent = data.populated ? `${data.document_count} chunks` : 'Empty';
             } catch (e) {
-                document.getElementById('kbStatus').textContent = 'Error';
+                document.getElementById('kbChunks').textContent = 'Error';
             }
+        }
+
+        async function loadKBStandards() {
+            try {
+                const res = await fetch('/knowledge/standards');
+                const data = await res.json();
+                const list = document.getElementById('kbStandardsList');
+                if (!data.standards || data.standards.length === 0) {
+                    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">No standards loaded</div>';
+                    return;
+                }
+                list.innerHTML = '';
+                data.standards.forEach(s => {
+                    const div = document.createElement('div');
+                    div.className = 'standard-item';
+                    div.innerHTML = `<div class="std-title">${s.title}</div><div class="std-file">${s.filename} · ${(s.size_bytes / 1024).toFixed(1)} KB</div>`;
+                    list.appendChild(div);
+                });
+            } catch (e) {
+                console.error('Error loading standards:', e);
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Documents
+        // ------------------------------------------------------------------
+        function setupDragDrop() {
+            const area = document.getElementById('uploadArea');
+            ['dragenter','dragover'].forEach(e => area.addEventListener(e, ev => { ev.preventDefault(); area.classList.add('drag-over'); }));
+            ['dragleave','drop'].forEach(e => area.addEventListener(e, ev => { ev.preventDefault(); area.classList.remove('drag-over'); }));
+            area.addEventListener('drop', e => { if (e.dataTransfer.files.length > 0) uploadFileObj(e.dataTransfer.files[0]); });
         }
 
         async function loadDocuments() {
@@ -397,31 +1093,27 @@
                 const res = await fetch(`/documents?user_id=${USER_ID}`);
                 const data = await res.json();
                 const list = document.getElementById('docList');
+                const healthDocs = document.getElementById('healthDocs');
                 list.innerHTML = '';
-                if (data.documents && data.documents.length > 0) {
-                    data.documents.forEach(doc => {
-                        const div = document.createElement('div');
-                        div.className = 'doc-item';
-                        div.innerHTML = `
-                            <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
-                            <span class="doc-chunks">${doc.chunk_count} chunks</span>
-                            <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete">✕</button>
-                        `;
-                        list.appendChild(div);
-                    });
-                }
-            } catch (e) {
-                console.error('Error loading documents:', e);
-            }
+                const docs = data.documents || [];
+                healthDocs.textContent = docs.length;
+                docs.forEach(doc => {
+                    const div = document.createElement('div');
+                    div.className = 'doc-item';
+                    div.innerHTML = `
+                        <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
+                        <span class="doc-meta">${doc.chunk_count} chunks</span>
+                        <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete">✕</button>`;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error('Error loading documents:', e); }
         }
 
-        function uploadFile(input) {
-            if (input.files.length > 0) uploadFileObj(input.files[0]);
-        }
+        function uploadFile(input) { if (input.files.length > 0) uploadFileObj(input.files[0]); }
 
         async function uploadFileObj(file) {
             const progress = document.getElementById('uploadProgress');
-            progress.style.display = 'block';
+            progress.className = 'upload-progress show loading';
             progress.textContent = `Uploading ${file.name}...`;
 
             const formData = new FormData();
@@ -431,64 +1123,165 @@
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
-
                 if (data.success) {
-                    progress.textContent = `✓ ${file.name}: ${data.chunks} chunks`;
-                    addMessage('agent', `Document "${file.name}" uploaded successfully. ${data.chunks} chunks indexed (${data.characters} characters). You can now ask questions about this document or run a compliance evaluation.`);
+                    progress.className = 'upload-progress show success';
+                    progress.textContent = `✓ ${file.name}: ${data.chunks} chunks indexed`;
+                    showToast(`Document "${file.name}" uploaded — ${data.chunks} chunks indexed`, 'success');
                     loadDocuments();
+                    loadAuditLogs();
                 } else {
-                    progress.textContent = `✗ Error: ${data.error}`;
+                    progress.className = 'upload-progress show error';
+                    progress.textContent = `✗ ${data.error}`;
+                    showToast(`Upload failed: ${data.error}`, 'error');
                 }
             } catch (e) {
+                progress.className = 'upload-progress show error';
                 progress.textContent = `✗ Upload failed: ${e.message}`;
+                showToast(`Upload failed: ${e.message}`, 'error');
             }
 
-            setTimeout(() => { progress.style.display = 'none'; }, 5000);
+            setTimeout(() => { progress.className = 'upload-progress'; }, 6000);
             document.getElementById('fileInput').value = '';
         }
 
         async function deleteDocument(docId) {
-            if (!confirm('Delete this document?')) return;
+            if (!confirm('Delete this document and its indexed chunks?')) return;
             try {
                 await fetch(`/documents/${docId}?user_id=${USER_ID}`, { method: 'DELETE' });
                 loadDocuments();
-            } catch (e) {
-                console.error('Error deleting document:', e);
-            }
+                loadAuditLogs();
+                showToast('Document deleted', 'info');
+            } catch (e) { console.error('Error deleting document:', e); }
         }
 
+        // ------------------------------------------------------------------
+        // Evaluation
+        // ------------------------------------------------------------------
         async function runEvaluation() {
             const btn = document.getElementById('evalButton');
             btn.disabled = true;
             btn.textContent = 'Evaluating...';
 
-            const industry = document.getElementById('evalIndustry').value;
-            const country = document.getElementById('evalCountry').value;
+            const standards = getSelectedStandards();
 
-            addMessage('user', `Run compliance evaluation${industry ? ' for ' + industry : ''}${country ? ' in ' + country : ''}`);
-            document.getElementById('logsContent').innerHTML = '<div class="log-entry">Running compliance evaluation...</div>';
+            addMessage('user', `Run compliance evaluation against ${standards.length} standard(s) — Fintech / Pakistan`);
+            showTyping(true);
 
             try {
                 const res = await fetch('/evaluate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: USER_ID, industry, country })
+                    body: JSON.stringify({ user_id: USER_ID, standards })
                 });
                 const data = await res.json();
+                showTyping(false);
 
                 if (data.error) {
-                    addMessage('agent', `Error: ${data.error}`);
+                    addMessage('agent', `**Error:** ${data.error}`);
+                    showToast(data.error, 'error');
                 } else {
                     addMessage('agent', data.report);
+                    showToast(`Evaluation complete — Report ID: ${data.report_id}`, 'success');
+                    loadReports();
                 }
+                loadAuditLogs();
             } catch (e) {
-                addMessage('agent', `Evaluation failed: ${e.message}`);
+                showTyping(false);
+                addMessage('agent', `**Evaluation failed:** ${e.message}`);
+                showToast(`Evaluation failed: ${e.message}`, 'error');
             }
 
             btn.disabled = false;
-            btn.textContent = 'Run Evaluation';
+            btn.textContent = 'Run Compliance Evaluation';
         }
 
+        // ------------------------------------------------------------------
+        // Report History
+        // ------------------------------------------------------------------
+        async function loadReports() {
+            try {
+                const res = await fetch(`/reports?user_id=${USER_ID}`);
+                const data = await res.json();
+                const list = document.getElementById('reportList');
+                const reports = data.reports || [];
+
+                if (reports.length === 0) {
+                    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">No reports yet</div>';
+                    return;
+                }
+
+                list.innerHTML = '';
+                reports.forEach(r => {
+                    const d = new Date(r.timestamp);
+                    const div = document.createElement('div');
+                    div.className = 'doc-item';
+                    div.innerHTML = `
+                        <span class="doc-name" title="${r.standards.join(', ')}">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
+                        <span class="doc-meta">${r.standards.length} stds</span>
+                        <button class="delete-btn" onclick="downloadReport('${r.report_id}')" title="Download" style="color:var(--accent);">⬇</button>`;
+                    div.style.cursor = 'pointer';
+                    div.onclick = (e) => { if (!e.target.classList.contains('delete-btn')) viewReport(r.report_id); };
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error('Error loading reports:', e); }
+        }
+
+        async function viewReport(reportId) {
+            try {
+                const res = await fetch(`/reports/${reportId}?user_id=${USER_ID}`);
+                const data = await res.json();
+                if (data.report_text) addMessage('agent', data.report_text);
+            } catch (e) { showToast('Failed to load report', 'error'); }
+        }
+
+        function downloadReport(reportId) {
+            window.open(`/reports/${reportId}/download?user_id=${USER_ID}`, '_blank');
+        }
+
+        // ------------------------------------------------------------------
+        // Audit Trail
+        // ------------------------------------------------------------------
+        async function loadAuditLogs() {
+            try {
+                const res = await fetch(`/audit/logs?limit=50`);
+                const data = await res.json();
+                const list = document.getElementById('auditLogList');
+                const logs = data.logs || [];
+
+                if (logs.length === 0) {
+                    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">No audit events</div>';
+                    return;
+                }
+
+                list.innerHTML = '';
+                logs.forEach(log => {
+                    const d = new Date(log.timestamp);
+                    const time = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                    const div = document.createElement('div');
+                    div.className = 'audit-entry';
+                    const badge = log.status === 'success' ? '<span class="audit-badge success">OK</span>' : '<span class="audit-badge failure">ERR</span>';
+                    div.innerHTML = `
+                        <span class="audit-time">${time}</span>
+                        <span class="audit-action">${formatAction(log.action)}</span>
+                        <span class="audit-user">${log.user_id}</span>
+                        ${badge}`;
+                    list.appendChild(div);
+                });
+            } catch (e) { console.error('Error loading audit logs:', e); }
+        }
+
+        function formatAction(action) {
+            return action.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        }
+
+        function exportAudit() {
+            window.open('/audit/export', '_blank');
+            showToast('Audit log exported', 'info');
+        }
+
+        // ------------------------------------------------------------------
+        // Chat
+        // ------------------------------------------------------------------
         function handleKeyPress(event) {
             if (event.key === 'Enter' && !event.shiftKey) {
                 event.preventDefault();
@@ -504,11 +1297,12 @@
             addMessage('user', message);
             input.value = '';
 
-            const sendButton = document.getElementById('sendButton');
-            sendButton.disabled = true;
-            sendButton.textContent = 'Processing...';
+            const sendBtn = document.getElementById('sendButton');
+            sendBtn.disabled = true;
+            showTyping(true);
 
-            document.getElementById('logsContent').innerHTML = '<div class="log-entry">Processing...</div>';
+            const logsContent = document.getElementById('logsContent');
+            logsContent.innerHTML = '<div class="log-entry">Processing...</div>';
 
             try {
                 const response = await fetch('/chat', {
@@ -516,49 +1310,162 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ message, verbose: true, user_id: USER_ID })
                 });
-
                 const data = await response.json();
+                showTyping(false);
 
                 if (data.error) {
-                    addMessage('agent', `Error: ${data.error}`);
+                    addMessage('agent', `**Error:** ${data.error}`);
                 } else {
-                    let responseText = data.response;
-                    if (data.strategy) {
-                        responseText += `\n\n(Strategy: ${data.strategy}`;
-                        if (data.steps > 0) responseText += `, Steps: ${data.steps}`;
-                        responseText += ')';
-                    }
-                    addMessage('agent', responseText);
+                    let txt = data.response;
+                    if (data.strategy) txt += `\n\n---\n*Strategy: ${data.strategy}${data.steps > 0 ? `, Steps: ${data.steps}` : ''}*`;
+                    addMessage('agent', txt);
                     if (data.logs) displayLogs(data.logs);
                 }
+                loadAuditLogs();
             } catch (error) {
-                addMessage('agent', `Error: ${error.message}`);
+                showTyping(false);
+                addMessage('agent', `**Error:** ${error.message}`);
             }
 
-            sendButton.disabled = false;
-            sendButton.textContent = 'Send';
+            sendBtn.disabled = false;
         }
 
+        // ------------------------------------------------------------------
+        // Message rendering (lightweight markdown)
+        // ------------------------------------------------------------------
         function addMessage(sender, content) {
             const container = document.getElementById('chatMessages');
             const div = document.createElement('div');
             div.className = `message ${sender}-message`;
-            const label = sender === 'user' ? 'You' : 'Agent';
-            div.innerHTML = `<strong>${label}:</strong> ${content.replace(/\n/g, '<br>')}`;
+
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+
+            const headerLabel = sender === 'user' ? 'You' : 'Agent';
+            const rendered = sender === 'agent' ? renderMarkdown(content) : escapeHtml(content);
+
+            div.innerHTML = `
+                <div class="msg-header">${headerLabel}</div>
+                <div class="msg-bubble">${rendered}</div>
+                <div class="msg-time">${timeStr}</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
         }
 
+        function renderMarkdown(text) {
+            if (!text) return '';
+            let html = escapeHtml(text);
+
+            // Code blocks (triple backtick)
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code.trim()}</code></pre>`);
+            // Inline code
+            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Bold
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // Italic
+            html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+            // Headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            // Horizontal rule
+            html = html.replace(/^---$/gm, '<hr>');
+            // Blockquote
+            html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+            // Unordered lists
+            html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+            html = html.replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`);
+            // Ordered lists
+            html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+            // Tables
+            html = html.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)*)/g, (_, header, body) => {
+                const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+                const rows = body.trim().split('\n').map(row => {
+                    const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+                    return `<tr>${tds}</tr>`;
+                }).join('');
+                return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
+            });
+            // Paragraphs
+            html = html.replace(/\n\n/g, '</p><p>');
+            html = html.replace(/\n/g, '<br>');
+            html = `<p>${html}</p>`;
+            html = html.replace(/<p><\/p>/g, '');
+            html = html.replace(/<p>(<h[123]>)/g, '$1');
+            html = html.replace(/(<\/h[123]>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<ul>)/g, '$1');
+            html = html.replace(/(<\/ul>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<table>)/g, '$1');
+            html = html.replace(/(<\/table>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<pre>)/g, '$1');
+            html = html.replace(/(<\/pre>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<hr>)<\/p>/g, '$1');
+            html = html.replace(/<p>(<blockquote>)/g, '$1');
+            html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
+
+            return html;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ------------------------------------------------------------------
+        // Typing Indicator
+        // ------------------------------------------------------------------
+        function showTyping(show) {
+            document.getElementById('typingIndicator').classList.toggle('show', show);
+            if (show) {
+                const msgs = document.getElementById('chatMessages');
+                msgs.scrollTop = msgs.scrollHeight;
+            }
+        }
+
+        // ------------------------------------------------------------------
+        // Logs
+        // ------------------------------------------------------------------
         function displayLogs(logs) {
             const container = document.getElementById('logsContent');
             container.innerHTML = '';
             logs.forEach(log => {
                 const div = document.createElement('div');
                 div.className = 'log-entry';
-                div.textContent = log;
+                div.innerHTML = log.replace(/\[(\d{2}:\d{2}:\d{2})\]/, '<span class="log-time">[$1]</span>');
                 container.appendChild(div);
             });
             container.scrollTop = container.scrollHeight;
+        }
+
+        // ------------------------------------------------------------------
+        // Session
+        // ------------------------------------------------------------------
+        async function resetSession() {
+            if (!confirm('Reset the current session? This will clear conversation history.')) return;
+            try {
+                await fetch('/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ user_id: USER_ID })
+                });
+                document.getElementById('chatMessages').innerHTML = '';
+                addMessage('agent', 'Session reset. Conversation history cleared.');
+                loadAuditLogs();
+                showToast('Session reset', 'info');
+            } catch (e) { showToast('Failed to reset session', 'error'); }
+        }
+
+        // ------------------------------------------------------------------
+        // Toast
+        // ------------------------------------------------------------------
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4200);
         }
     </script>
 </body>

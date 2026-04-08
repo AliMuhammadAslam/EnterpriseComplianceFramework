@@ -70,7 +70,18 @@ graph TD
 │   ├── nist_csf.md
 │   ├── hipaa.md
 │   ├── pci_dss.md
-│   └── cobit.md
+│   ├── cobit.md
+│   ├── iso_22301.md
+│   ├── iso_31000.md
+│   ├── csa_ccm.md
+│   ├── basel_framework.md
+│   ├── psd2_open_banking.md
+│   ├── swift_csp.md
+│   ├── fatf_guidelines.md
+│   ├── pakistan_aml_cft.md
+│   ├── peca_2016.md
+│   ├── sbp_regulations.md
+│   └── secp_guidelines.md
 │
 ├── document_upload/
 │   ├── manager.py            # Full upload pipeline: validate → parse → chunk → embed → store
@@ -79,11 +90,11 @@ graph TD
 │
 ├── evaluation/
 │   ├── engine.py             # RAG-powered compliance gap analysis engine
-│   └── report.py             # Pydantic report models + Markdown formatter
+│   ├── report.py             # Pydantic report models + Markdown formatter
+│   └── report_store.py       # Persists and retrieves evaluation reports per user
 │
-├── tools/
-│   ├── base_tool.py          # Abstract base class for all tools
-│   └── tool_manager.py       # Dynamically loads tools from tools/available/
+├── audit/
+│   └── audit_logger.py       # Singleton audit trail logger (JSON Lines + CSV export)
 │
 ├── utils/
 │   └── logger.py             # Singleton logger (component-scoped)
@@ -113,9 +124,28 @@ Every user query follows a fixed pipeline:
 | 5 | **Memory** | Stores the interaction in short-term session memory and persists it to `agent_memory.json` |
 
 ### RAG & Knowledge Layer
-- **Regulatory KB**: Seven authoritative compliance standards pre-loaded from `knowledge_data/` into a shared `regulatory_knowledge` ChromaDB collection on first startup.
+- **Regulatory KB**: Eighteen authoritative compliance standards pre-loaded from `knowledge_data/` into a shared `regulatory_knowledge` ChromaDB collection on first startup.
 - **Company Documents**: User-uploaded documents are parsed, chunked, embedded, and stored in a per-user isolated collection (`company_docs_{user_id}`).
 - **Context injection**: RAG context is injected at three levels — Planner prompt, each Executor LLM call, and the final result compilation — ensuring citation-backed responses throughout.
+
+### Audit Trail
+Every system action is recorded to `audit_logs/audit_log.jsonl` via the `AuditLogger` singleton. Tracked actions include:
+
+| Action | Description |
+|---|---|
+| `CHAT_QUERY` | User sent a chat query |
+| `DOCUMENT_UPLOAD` | Document uploaded to the system |
+| `DOCUMENT_DELETE` | Document deleted from the system |
+| `EVALUATION_RUN` | Compliance evaluation executed |
+| `REPORT_DOWNLOAD` | Evaluation report downloaded |
+| `SESSION_RESET` | User session reset |
+| `KNOWLEDGE_INGEST` | Knowledge base ingested or re-ingested |
+| `SYSTEM_START` | Application started |
+
+The audit log supports filtering by `user_id`, `action`, `resource_type`, timestamp range, and status, and can be exported as CSV for compliance reporting.
+
+### Report Store
+Evaluation reports are persisted as JSON files under `reports/{user_id}/{report_id}.json` by `ReportStore`. Reports can be listed, retrieved, downloaded as Markdown, or deleted via the API.
 
 ### Compliance Evaluation Engine
 Triggered via the `/evaluate` endpoint or the web UI. The engine:
@@ -135,6 +165,17 @@ Triggered via the `/evaluate` endpoint or the web UI. The engine:
 | HIPAA | Healthcare Data Privacy |
 | PCI DSS | Payment Card Security |
 | COBIT | IT Governance & Management |
+| ISO 22301 | Business Continuity Management |
+| ISO 31000 | Risk Management |
+| CSA CCM | Cloud Security Alliance — Cloud Controls Matrix |
+| Basel Framework | Banking Capital & Risk Regulation |
+| PSD2 / Open Banking | EU Payment Services Directive |
+| SWIFT CSP | SWIFT Customer Security Programme |
+| FATF Guidelines | Anti-Money Laundering / Counter-Terrorist Financing |
+| Pakistan AML/CFT | Pakistan AML & CFT Rules |
+| PECA 2016 | Pakistan Electronic Crime Act |
+| SBP Regulations | State Bank of Pakistan Regulations |
+| SECP Guidelines | Securities & Exchange Commission of Pakistan |
 
 ---
 
@@ -202,6 +243,10 @@ KNOWLEDGE_BASE_PATH=./knowledge_data
 # Document Upload
 UPLOAD_DIR=./uploads
 MAX_UPLOAD_SIZE_MB=50
+
+# Reports & Audit
+REPORTS_DIR=./reports
+AUDIT_LOG_DIR=./audit_logs
 
 # Logging
 LOG_LEVEL=INFO
@@ -287,8 +332,15 @@ The system retrieves your uploaded documents and the relevant regulatory standar
 | `GET` | `/documents?user_id=` | List documents uploaded by a user |
 | `DELETE` | `/documents/<doc_id>?user_id=` | Delete a specific document |
 | `POST` | `/evaluate` | Run compliance evaluation; body: `{user_id, standards, industry, country}` |
+| `GET` | `/reports?user_id=` | List saved evaluation reports for a user |
+| `GET` | `/reports/<report_id>?user_id=` | Retrieve a specific report |
+| `GET` | `/reports/<report_id>/download?user_id=` | Download a report as a Markdown file |
+| `GET` | `/audit/logs` | Query audit trail (filters: `user_id`, `action`, `resource_type`, `start_date`, `end_date`, `status`, `limit`, `offset`) |
+| `GET` | `/audit/summary` | Aggregate audit statistics (event counts by action and user) |
+| `GET` | `/audit/export` | Export audit log as CSV |
 | `GET` | `/status` | System component status |
 | `GET` | `/knowledge/status` | Regulatory knowledge base status |
+| `GET` | `/knowledge/standards` | List all loaded regulatory standards with metadata |
 | `POST` | `/reset` | Reset the current session memory |
 
 ---
@@ -325,5 +377,7 @@ All settings are controlled via environment variables. The `Config` class in [co
 | `KNOWLEDGE_BASE_PATH` | `./knowledge_data` | Directory for regulatory Markdown files |
 | `UPLOAD_DIR` | `./uploads` | Directory for user-uploaded documents |
 | `MAX_UPLOAD_SIZE_MB` | `50` | Maximum upload file size |
+| `REPORTS_DIR` | `./reports` | Directory for persisted evaluation reports |
+| `AUDIT_LOG_DIR` | `./audit_logs` | Directory for audit trail log files |
 | `MEMORY_FILE` | `agent_memory.json` | Path for long-term memory persistence |
 | `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
