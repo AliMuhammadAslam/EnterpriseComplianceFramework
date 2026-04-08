@@ -6,3 +6,7 @@ uploads/
 agent_memory.json
 venv/
 *.log
+pytest_out.txt
+reports/
+audit_logs/
+.pytest_cache/

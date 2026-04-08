@@ -165,10 +165,45 @@ class KnowledgeBase:
 
         return chunks
 
+    def list_standards(self) -> List[Dict[str, Any]]:
+        """List all standard files in the knowledge data directory.
+
+        Returns:
+            List of dicts with filename, title, and file size for each file.
+        """
+        if not os.path.exists(self.knowledge_path):
+            return []
+
+        standards = []
+        files = (
+            glob.glob(os.path.join(self.knowledge_path, "*.md"))
+            + glob.glob(os.path.join(self.knowledge_path, "*.txt"))
+        )
+
+        for filepath in sorted(files):
+            filename = os.path.basename(filepath)
+            title = filename
+            try:
+                with open(filepath, "r", encoding="utf-8") as f:
+                    first_line = f.readline().strip()
+                    if first_line.startswith("#"):
+                        title = first_line.lstrip("#").strip()
+                file_size = os.path.getsize(filepath)
+                standards.append({
+                    "filename": filename,
+                    "title": title,
+                    "size_bytes": file_size,
+                })
+            except Exception as e:
+                self.logger.warning(f"Could not read {filename}: {e}")
+
+        return standards
+
     def get_status(self) -> Dict[str, Any]:
-        """Return status of the knowledge base."""
+        """Return current status of the knowledge base."""
         return {
             "populated": self.is_populated(),
             "document_count": self.vector_store.knowledge_count(),
             "knowledge_path": self.knowledge_path,
+            "standards_count": len(self.list_standards()),
         }
