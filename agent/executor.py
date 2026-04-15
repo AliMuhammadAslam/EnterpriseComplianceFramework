@@ -16,12 +16,7 @@ class ExecutionResult(BaseModel):
 
 
 class Executor:
-    """Executes a Plan step by step using LLM reasoning.
-
-    Each step is processed by the LLM with the RAG context injected
-    into the system prompt, so responses are grounded in retrieved
-    regulatory and company document content.
-    """
+    """Runs a Plan step by step, injecting RAG context into each LLM call."""
 
     def __init__(self, model_name: str = "gpt-4o"):
         self.logger = logger_instance.get_logger("executor")
@@ -34,16 +29,7 @@ class Executor:
     def execute_plan(
         self, plan, verbose: bool = False, rag_context: str = ""
     ) -> ExecutionResult:
-        """Execute each step of a plan sequentially.
-
-        Args:
-            plan: The Plan produced by the Planner.
-            verbose: If True, print step-by-step progress to stdout.
-            rag_context: Retrieved context to inject into every LLM call.
-
-        Returns:
-            ExecutionResult with the compiled final answer.
-        """
+        """Execute plan steps sequentially and return a compiled result."""
         self.logger.info(f"Executing plan with {len(plan.steps)} steps")
 
         step_results = []
@@ -84,7 +70,7 @@ class Executor:
     def _execute_with_llm(
         self, step, previous_results: List[Dict], rag_context: str = ""
     ) -> str:
-        """Run a single plan step through the LLM with RAG context."""
+        """Send a single plan step to the LLM with accumulated context."""
         prior_context = ""
         if previous_results:
             prior_context = "Previous steps:\n"
@@ -105,7 +91,10 @@ Cite specific standards, clauses, or articles where applicable.
 
 Use the provided reference material to give accurate, well-cited responses.
 {rag_section}
-Provide clear, specific, and actionable results. Cite relevant standards or regulations where applicable."""
+Provide clear, specific, and actionable results. Citation rules:
+- Use ONLY the control numbers, clause numbers, article numbers, and section identifiers that appear in the provided reference material above. Do not rely on your training knowledge for specific identifiers — standards are versioned and numbering changes between versions.
+- Every requirement or control you mention must include its identifier exactly as it appears in the reference material (e.g. the clause number, article number, control ID, or section reference).
+- If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one."""
 
         try:
             response = completion(
@@ -122,7 +111,7 @@ Provide clear, specific, and actionable results. Cite relevant standards or regu
             return f"Error executing step: {str(e)}"
 
     def _dependencies_met(self, step, completed_steps: List[Dict]) -> bool:
-        """Return True if all declared dependencies have completed successfully."""
+        """Check that all declared step dependencies have already succeeded."""
         if not step.dependencies:
             return True
         completed = {r["step_number"] for r in completed_steps if r.get("success")}
@@ -131,7 +120,7 @@ Provide clear, specific, and actionable results. Cite relevant standards or regu
     def _compile_final_result(
         self, step_results: List[Dict], goal: str, rag_context: str = ""
     ) -> str:
-        """Summarise all step outputs into a single coherent answer."""
+        """Combine all step outputs into a single final answer."""
         successful = [r for r in step_results if r.get("success") and r.get("result")]
 
         if not successful:
@@ -144,9 +133,10 @@ Provide clear, specific, and actionable results. Cite relevant standards or regu
         system_message = f"""You are a compliance and governance specialist summarising analysis results.
 {rag_section}
 Write a clear, comprehensive answer that directly addresses what the user asked.
-- For compliance/regulatory questions: cite specific standards, clauses, and articles
 - Structure your response with clear sections where appropriate
-- Do not mention internal processing steps"""
+- Do not mention internal processing steps
+- If the context indicates that no company documents have been uploaded, explicitly tell the user that your response is based solely on the regulatory knowledge base and that uploading company documents will enable document-specific analysis
+- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned — do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly."""
 
         try:
             response = completion(

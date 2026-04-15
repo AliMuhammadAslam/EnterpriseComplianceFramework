@@ -1,4 +1,7 @@
 import os
+import glob
+import hashlib
+import json
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
@@ -26,15 +29,7 @@ class OrchestrationResult(BaseModel):
 
 
 class Orchestrator:
-    """Central coordinator for the compliance agent pipeline.
-
-    On each user query, the pipeline runs in order:
-        1. Perception  — classify the user's intent
-        2. RAG         — retrieve relevant regulatory and company doc context
-        3. Planner     — generate a structured step plan (LLM + RAG context)
-        4. Executor    — execute the plan step by step (LLM + RAG context)
-        5. Memory      — store the interaction for the session
-    """
+    """Coordinates the full agent pipeline: perception → RAG → plan → execute → memory."""
 
     def __init__(self, model_name: str = "gpt-4o", agent_role: str = ""):
         self.model_name = model_name
@@ -56,16 +51,47 @@ class Orchestrator:
         self.logger.info("Orchestrator initialised")
 
     def _initialize_knowledge_base(self):
-        """Ingest regulatory knowledge base on first startup."""
+        """Ingest the knowledge base on startup; re-ingest if files have changed."""
         try:
-            if not self.knowledge_base.is_populated():
-                self.logger.info("Ingesting regulatory knowledge base...")
-                self.knowledge_base.ingest()
+            knowledge_path = os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge_data")
+            current_hash = self._hash_knowledge_files(knowledge_path)
+            hash_file = os.path.join(knowledge_path, ".kb_hash")
+
+            stored_hash = ""
+            if os.path.exists(hash_file):
+                with open(hash_file, "r") as f:
+                    stored_hash = f.read().strip()
+
+            needs_ingest = (
+                not self.knowledge_base.is_populated()
+                or current_hash != stored_hash
+            )
+
+            if needs_ingest:
+                self.logger.info("Ingesting regulatory knowledge base (new or updated files)...")
+                self.knowledge_base.ingest(force=True)
+                with open(hash_file, "w") as f:
+                    f.write(current_hash)
                 self.logger.info("Knowledge base ingestion complete")
             else:
-                self.logger.info("Knowledge base already populated")
+                self.logger.info("Knowledge base up to date, skipping ingestion")
         except Exception as e:
             self.logger.error(f"Error initialising knowledge base: {e}")
+
+    def _hash_knowledge_files(self, knowledge_path: str) -> str:
+        """MD5 hash of all knowledge files, used to detect content changes."""
+        h = hashlib.md5()
+        files = sorted(
+            glob.glob(os.path.join(knowledge_path, "*.md"))
+            + glob.glob(os.path.join(knowledge_path, "*.txt"))
+        )
+        for filepath in files:
+            try:
+                with open(filepath, "rb") as f:
+                    h.update(f.read())
+            except Exception:
+                pass
+        return h.hexdigest()
 
     def run(
         self,
@@ -73,24 +99,24 @@ class Orchestrator:
         verbose: bool = False,
         user_id: str = "default",
     ) -> OrchestrationResult:
-        """Process a user query through the full agent pipeline."""
+        """Process a user query through the full pipeline."""
         try:
             if verbose:
                 print(f"[ORCHESTRATOR] Input: {user_input[:100]}...")
 
             self.logger.info(f"Processing: {user_input[:100]}...")
 
-            # Step 1: Perception
+            # perception
             perception_output = self.perception.process_input(user_input)
             if verbose:
                 print(f"[PERCEPTION] Intent: {perception_output.intent}")
 
-            # Step 2: RAG retrieval
+            # context retrieval
             rag_context = self.rag_pipeline.retrieve_context(user_input, user_id=user_id)
             if verbose:
                 print(f"[RAG] Retrieved {len(rag_context)} chars of context")
 
-            # Steps 3 + 4: Plan and execute
+            # plan and execute
             if verbose:
                 print("[PLANNER] Creating plan...")
 
@@ -104,7 +130,7 @@ class Orchestrator:
 
             execution_result = self.executor.execute_plan(plan, verbose, rag_context=rag_context)
 
-            # Step 5: Memory
+            # store interaction
             self.memory.add_interaction(user_input, execution_result.result)
 
             if verbose:
@@ -135,7 +161,7 @@ class Orchestrator:
         industry: str = "",
         country: str = "",
     ) -> str:
-        """Run a compliance evaluation for a user's uploaded documents."""
+        """Delegate to the evaluation engine for a user's compliance report."""
         return self.evaluation_engine.evaluate_compliance(
             user_id=user_id,
             standards=standards,
@@ -144,7 +170,7 @@ class Orchestrator:
         )
 
     def get_system_status(self) -> Dict[str, Any]:
-        """Return current status of all system components."""
+        """Return status for all pipeline components."""
         return {
             "components": {
                 "perception": "active",
@@ -166,7 +192,7 @@ class Orchestrator:
         }
 
     def reset_session(self):
-        """End the current session and start a fresh one."""
+        """Clear memory and start a fresh session."""
         self.memory.end_current_session()
         self.memory.start_new_session()
         self.logger.info("Session reset")
