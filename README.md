@@ -192,7 +192,7 @@ Triggered via the `/evaluate` endpoint or the web UI. The engine:
 
 ```bash
 git clone <repository-url>
-cd agentframeworkprototype
+cd EnterpriseComplianceFramework
 ```
 
 **2. Create and activate a virtual environment**
@@ -252,7 +252,7 @@ AUDIT_LOG_DIR=./audit_logs
 LOG_LEVEL=INFO
 ```
 
-> **Note:** On first startup the system will automatically ingest all files from `knowledge_data/` into ChromaDB. This takes a few seconds and runs only once.
+> **Note:** On first startup the system ingests all files from `knowledge_data/` into ChromaDB. It also re-ingests automatically whenever those files change, so no manual steps are needed after updating a knowledge file.
 
 ---
 
@@ -354,8 +354,7 @@ The system retrieves your uploaded documents and the relevant regulatory standar
 
 ### Adding a New Regulatory Standard
 1. Add a `.md` or `.txt` file to `knowledge_data/`
-2. Delete (or clear) the ChromaDB collection at `./chroma_db` to force re-ingestion
-3. Restart the application — the new standard is ingested automatically
+2. Restart the application — it detects the change and re-ingests automatically
 
 ---
 

@@ -269,26 +269,43 @@
         .eval-form input::placeholder { color: rgba(255,255,255,0.25); }
 
         .standards-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 0.25rem 0.5rem;
-            max-height: 180px;
+            display: flex;
+            flex-direction: column;
+            gap: 0.15rem;
+            max-height: 190px;
             overflow-y: auto;
         }
+
+        .standards-grid::-webkit-scrollbar { width: 3px; }
+        .standards-grid::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 2px; }
 
         .std-check {
             display: flex;
             align-items: center;
-            gap: 0.3rem;
-            font-size: 0.72rem;
-            color: rgba(255,255,255,0.7);
+            gap: 0.5rem;
+            padding: 0.3rem 0.4rem;
+            border-radius: var(--radius-sm);
             cursor: pointer;
+            transition: background var(--transition);
         }
+
+        .std-check:hover { background: rgba(255,255,255,0.05); }
 
         .std-check input[type="checkbox"] {
             accent-color: var(--accent);
-            width: 14px; height: 14px;
+            width: 13px; height: 13px;
+            flex-shrink: 0;
             cursor: pointer;
+        }
+
+        .std-check-label {
+            font-size: 0.78rem;
+            color: rgba(255,255,255,0.75);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            flex: 1;
+            min-width: 0;
         }
 
         .btn-primary {
@@ -335,7 +352,7 @@
             font-size: 0.7rem;
         }
 
-        .audit-entry .audit-time { color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 55px; }
+        .audit-entry .audit-time { color: var(--text-muted); font-variant-numeric: tabular-nums; min-width: 105px; white-space: nowrap; }
         .audit-entry .audit-action { font-weight: 500; color: rgba(255,255,255,0.8); }
         .audit-entry .audit-user { color: var(--accent); }
 
@@ -366,27 +383,168 @@
 
         /* Session bar */
         .session-bar {
-            padding: 0.75rem 1.25rem;
+            padding: 0.85rem 1.25rem;
             border-top: 1px solid rgba(255,255,255,0.06);
+            background: rgba(0,0,0,0.15);
+            position: relative;
+        }
+
+        .session-bar-label {
+            font-size: 0.65rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+        }
+
+        /* Custom user picker trigger */
+        .user-select-wrapper {
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-        }
-
-        .session-bar label { font-size: 0.7rem; color: var(--text-muted); font-weight: 500; }
-
-        .session-bar input {
-            flex: 1;
-            padding: 0.35rem 0.5rem;
+            gap: 0.65rem;
             background: var(--bg-secondary);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: var(--radius-sm);
-            color: var(--text-inverse);
-            font-family: inherit;
-            font-size: 0.78rem;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius-md);
+            padding: 0.55rem 0.75rem;
+            cursor: pointer;
+            transition: border-color var(--transition), box-shadow var(--transition);
+            user-select: none;
         }
 
-        .session-bar input:focus { outline: none; border-color: var(--accent); }
+        .user-select-wrapper:hover {
+            border-color: rgba(255,255,255,0.2);
+        }
+
+        .user-select-wrapper.open {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+
+        .user-avatar {
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+
+        .user-select-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .user-display-name {
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-inverse);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .user-display-role {
+            font-size: 0.67rem;
+            color: var(--text-muted);
+            margin-top: 0.05rem;
+        }
+
+        .user-select-chevron {
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            flex-shrink: 0;
+            transition: transform var(--transition);
+        }
+
+        .user-select-wrapper.open .user-select-chevron {
+            transform: rotate(180deg);
+        }
+
+        /* Dropdown panel — floats above the session bar */
+        .user-dropdown {
+            display: none;
+            position: absolute;
+            bottom: calc(100% + 6px);
+            left: 1.25rem;
+            right: 1.25rem;
+            background: #1e293b;
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: var(--radius-md);
+            box-shadow: 0 -8px 24px rgba(0,0,0,0.35);
+            overflow: hidden;
+            z-index: 200;
+            animation: dropUp 0.15s ease;
+        }
+
+        @keyframes dropUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+
+        .user-dropdown.open { display: block; }
+
+        .user-dropdown-header {
+            padding: 0.6rem 0.85rem 0.4rem;
+            font-size: 0.63rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-muted);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .user-dropdown-item {
+            display: flex;
+            align-items: center;
+            gap: 0.65rem;
+            padding: 0.6rem 0.85rem;
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+
+        .user-dropdown-item:hover {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .user-dropdown-item.active {
+            background: rgba(59,130,246,0.1);
+        }
+
+        .user-dropdown-item .item-avatar {
+            width: 28px; height: 28px;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+            color: white;
+            flex-shrink: 0;
+            text-transform: uppercase;
+        }
+
+        .user-dropdown-item .item-text { flex: 1; min-width: 0; }
+        .user-dropdown-item .item-name {
+            font-size: 0.82rem;
+            font-weight: 500;
+            color: var(--text-inverse);
+        }
+        .user-dropdown-item .item-role {
+            font-size: 0.67rem;
+            color: var(--text-muted);
+            margin-top: 0.05rem;
+        }
+
+        .user-dropdown-item .item-check {
+            font-size: 0.75rem;
+            color: var(--accent);
+            flex-shrink: 0;
+            opacity: 0;
+        }
+
+        .user-dropdown-item.active .item-check { opacity: 1; }
 
         /* ---- Main Content ---- */
         .main-content {
@@ -513,9 +671,9 @@
         .agent-message .msg-bubble h1 { font-size: 1.2rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
         .agent-message .msg-bubble h2 { font-size: 1.05rem; font-weight: 700; margin: 0.5rem 0 0.3rem; color: var(--accent); }
         .agent-message .msg-bubble h3 { font-size: 0.92rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
-        .agent-message .msg-bubble p { margin: 0.3rem 0; }
-        .agent-message .msg-bubble ul, .agent-message .msg-bubble ol { padding-left: 1.3rem; margin: 0.3rem 0; }
-        .agent-message .msg-bubble li { margin-bottom: 0.15rem; }
+        .agent-message .msg-bubble p { margin: 0.2rem 0; }
+        .agent-message .msg-bubble ul, .agent-message .msg-bubble ol { padding-left: 1.3rem; margin: 0.2rem 0; }
+        .agent-message .msg-bubble li { margin-bottom: 0.1rem; }
         .agent-message .msg-bubble strong { font-weight: 600; }
 
         .agent-message .msg-bubble pre {
@@ -561,6 +719,21 @@
             margin: 0.4rem 0;
             color: var(--text-secondary);
             font-style: italic;
+        }
+
+        /* No-docs warning callout */
+        .agent-message .msg-bubble .no-docs-warning {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.5rem;
+            background: var(--warning-light);
+            border: 1px solid var(--warning);
+            border-radius: var(--radius-sm);
+            padding: 0.55rem 0.75rem;
+            margin-bottom: 0.6rem;
+            font-size: 0.82rem;
+            color: #92400e;
+            line-height: 1.5;
         }
 
         /* Typing indicator */
@@ -757,6 +930,194 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
+
+        /* ---- Modals ---- */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.55);
+            z-index: 2000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: fadeIn 0.15s ease;
+        }
+
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+        .modal-box {
+            background: var(--bg-surface);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-lg);
+            padding: 1.5rem;
+            min-width: 320px;
+            max-width: 480px;
+            animation: scaleIn 0.15s ease;
+        }
+
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.94); } to { opacity: 1; transform: scale(1); } }
+
+        .modal-title {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 0.6rem;
+        }
+
+        .modal-message {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.2rem;
+            line-height: 1.55;
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+
+        .btn-cancel {
+            padding: 0.45rem 0.9rem;
+            background: var(--bg-surface-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            color: var(--text-secondary);
+            transition: background var(--transition);
+        }
+
+        .btn-cancel:hover { background: var(--bg-hover); }
+
+        .btn-danger {
+            padding: 0.45rem 0.9rem;
+            background: var(--error);
+            color: white;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-family: inherit;
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: filter var(--transition);
+        }
+
+        .btn-danger:hover { filter: brightness(1.1); }
+
+        /* Report modal */
+        .modal-box.report-modal-box {
+            max-width: 820px;
+            width: 90vw;
+            max-height: 88vh;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .modal-header-actions {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .btn-modal-download {
+            padding: 0.35rem 0.75rem;
+            background: var(--accent-light);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-sm);
+            color: var(--accent);
+            font-family: inherit;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+
+        .btn-modal-download:hover { background: var(--accent); color: white; }
+
+        .btn-modal-close {
+            width: 28px; height: 28px;
+            background: var(--bg-surface-alt);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            display: flex; align-items: center; justify-content: center;
+            transition: background var(--transition);
+        }
+
+        .btn-modal-close:hover { background: var(--error-light); color: var(--error); border-color: var(--error); }
+
+        .modal-report-meta {
+            padding: 0.5rem 1.25rem;
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            background: var(--bg-surface-alt);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .modal-report-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.25rem;
+            font-size: 0.875rem;
+            line-height: 1.65;
+            color: var(--text-primary);
+        }
+
+        .modal-report-content::-webkit-scrollbar { width: 5px; }
+        .modal-report-content::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .modal-report-content h1 { font-size: 1.2rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
+        .modal-report-content h2 { font-size: 1.05rem; font-weight: 700; margin: 0.5rem 0 0.3rem; color: var(--accent); }
+        .modal-report-content h3 { font-size: 0.92rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
+        .modal-report-content p { margin: 0.3rem 0; }
+        .modal-report-content ul, .modal-report-content ol { padding-left: 1.3rem; margin: 0.3rem 0; }
+        .modal-report-content li { margin-bottom: 0.15rem; }
+        .modal-report-content strong { font-weight: 600; }
+        .modal-report-content hr { border: none; border-top: 1px solid var(--border); margin: 0.75rem 0; }
+        .modal-report-content table { border-collapse: collapse; width: 100%; margin: 0.5rem 0; font-size: 0.82rem; }
+        .modal-report-content th, .modal-report-content td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
+        .modal-report-content th { background: var(--bg-surface-alt); font-weight: 600; }
+
+        /* Standards tooltip in report history */
+        .std-tooltip-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+
+        .std-tooltip-wrapper .std-tooltip {
+            display: none;
+            position: fixed;
+            background: var(--bg-primary);
+            color: rgba(255,255,255,0.88);
+            font-size: 0.7rem;
+            padding: 0.5rem 0.75rem;
+            border-radius: var(--radius-sm);
+            white-space: nowrap;
+            line-height: 1.8;
+            z-index: 9999;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid rgba(255,255,255,0.12);
+            pointer-events: none;
+        }
+
+        .std-tooltip-wrapper:hover .std-tooltip { display: block; }
     </style>
 </head>
 <body>
@@ -811,7 +1172,7 @@
                     </button>
                     <div class="panel-body open" id="evalPanel">
                         <div class="eval-form">
-                            <label>Standards to Evaluate</label>
+                            <label>Select Standards to Evaluate</label>
                             <div class="standards-grid" id="standardsGrid"></div>
                             <button class="btn-success" onclick="runEvaluation()" id="evalButton">
                                 Run Compliance Evaluation
@@ -863,13 +1224,52 @@
 
             <!-- Session Bar -->
             <div class="session-bar">
-                <label>User:</label>
-                <select id="userIdInput" onchange="onUserIdChange()">
-                    <option value="default">default</option>
-                    <option value="analyst">analyst</option>
-                    <option value="auditor">auditor</option>
-                    <option value="admin">admin</option>
-                </select>
+                <!-- Dropdown panel (floats above) -->
+                <div class="user-dropdown" id="userDropdown">
+                    <div class="user-dropdown-header">Switch User</div>
+                    <div class="user-dropdown-item active" data-value="default" onclick="selectUser('default')">
+                        <div class="item-avatar" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6)">JS</div>
+                        <div class="item-text">
+                            <div class="item-name">John Smith</div>
+                            <div class="item-role">Default User</div>
+                        </div>
+                        <span class="item-check">✓</span>
+                    </div>
+                    <div class="user-dropdown-item" data-value="analyst" onclick="selectUser('analyst')">
+                        <div class="item-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">SJ</div>
+                        <div class="item-text">
+                            <div class="item-name">Sarah Johnson</div>
+                            <div class="item-role">Analyst</div>
+                        </div>
+                        <span class="item-check">✓</span>
+                    </div>
+                    <div class="user-dropdown-item" data-value="auditor" onclick="selectUser('auditor')">
+                        <div class="item-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">MC</div>
+                        <div class="item-text">
+                            <div class="item-name">Michael Chen</div>
+                            <div class="item-role">Auditor</div>
+                        </div>
+                        <span class="item-check">✓</span>
+                    </div>
+                    <div class="user-dropdown-item" data-value="admin" onclick="selectUser('admin')">
+                        <div class="item-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626)">ED</div>
+                        <div class="item-text">
+                            <div class="item-name">Emily Davis</div>
+                            <div class="item-role">Compliance Officer</div>
+                        </div>
+                        <span class="item-check">✓</span>
+                    </div>
+                </div>
+
+                <div class="session-bar-label">Active User</div>
+                <div class="user-select-wrapper" id="userSelectWrapper" onclick="toggleUserDropdown()">
+                    <div class="user-avatar" id="userAvatar" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6)">JS</div>
+                    <div class="user-select-info">
+                        <div class="user-display-name" id="userDisplayName">John Smith</div>
+                        <div class="user-display-role" id="userDisplayRole">Default User</div>
+                    </div>
+                    <span class="user-select-chevron">▾</span>
+                </div>
             </div>
         </aside>
 
@@ -896,21 +1296,6 @@
 
             <div class="chat-container">
                 <div class="chat-messages" id="chatMessages">
-                    <div class="message agent-message">
-                        <div class="msg-header">Agent</div>
-                        <div class="msg-bubble">
-                            <p>Welcome to <strong>ComplianceAI</strong> — your enterprise compliance and governance assistant.</p>
-                            <p>I'm backed by a regulatory knowledge base covering <strong>18 standards</strong> including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, COBIT, SBP regulations, SECP guidelines, FATF, Basel III/IV, and more.</p>
-                            <p>You can:</p>
-                            <ul>
-                                <li>Ask compliance and regulatory questions</li>
-                                <li>Upload company documents (PDF, DOCX, TXT)</li>
-                                <li>Run a structured compliance evaluation against your documents</li>
-                                <li>View evaluation report history</li>
-                            </ul>
-                        </div>
-                        <div class="msg-time">System</div>
-                    </div>
                 </div>
 
                 <div class="typing-indicator" id="typingIndicator">
@@ -938,6 +1323,35 @@
         </div>
     </div>
 
+    <!-- Confirmation Modal (#007) -->
+    <div class="modal-overlay" id="confirmModal" style="display:none" onclick="handleConfirmOverlayClick(event)">
+        <div class="modal-box">
+            <div class="modal-title" id="confirmModalTitle">Confirm</div>
+            <div class="modal-message" id="confirmModalMessage"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeConfirmModal()">Cancel</button>
+                <button class="btn-danger" id="confirmModalBtn">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Report View Modal (#005) -->
+    <div class="modal-overlay" id="reportModal" style="display:none" onclick="handleReportOverlayClick(event)">
+        <div class="modal-box report-modal-box">
+            <div class="modal-header">
+                <div class="modal-title">Compliance Evaluation Report</div>
+                <div class="modal-header-actions">
+                    <button class="btn-modal-download" id="reportModalDownloadBtn" onclick="downloadCurrentModalReport()">
+                        📥 Download (.md)
+                    </button>
+                    <button class="btn-modal-close" onclick="closeReportModal()" title="Close">✕</button>
+                </div>
+            </div>
+            <div class="modal-report-meta" id="reportModalMeta"></div>
+            <div class="modal-report-content" id="reportModalContent"></div>
+        </div>
+    </div>
+
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
 
@@ -957,6 +1371,7 @@
         // Init
         // ------------------------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
+            showWelcomeMessage(USER_META[USER_ID].name);
             loadKBStatus();
             loadDocuments();
             loadKBStandards();
@@ -1010,7 +1425,9 @@
                     const checked = DEFAULT_CHECKED_STANDARDS.includes(std);
                     const label = document.createElement('label');
                     label.className = 'std-check';
-                    label.innerHTML = `<input type="checkbox" value="${std}" ${checked ? 'checked' : ''}> ${std}`;
+                    label.title = std;
+                    label.innerHTML = `<input type="checkbox" value="${std}" ${checked ? 'checked' : ''}>
+                        <span class="std-check-label">${std}</span>`;
                     grid.appendChild(label);
                 });
             } catch (e) {
@@ -1033,14 +1450,78 @@
         }
 
         // ------------------------------------------------------------------
-        // User ID
+        // Welcome message
         // ------------------------------------------------------------------
-        function onUserIdChange() {
-            USER_ID = document.getElementById('userIdInput').value;
+        function showWelcomeMessage(name) {
+            addMessage('agent',
+                `Hello, **${name}**! Welcome to **ComplianceAI**.\n\nI'm an AI-powered compliance and governance assistant designed to help fintech organisations operating in Pakistan stay on top of regulatory requirements. I'm backed by a knowledge base covering **18 standards and frameworks** including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, SBP Regulations, SECP Guidelines, FATF, Basel III/IV, and more.\n\nHere's how I can help you:\n- Answer questions on compliance standards, regulations, and best practices\n- Analyse your uploaded company documents against regulatory requirements\n- Run structured compliance evaluations and generate gap analysis reports\n- Maintain a full audit trail of all actions for accountability\n\nHow can I assist you today?`
+            );
+        }
+
+        // ------------------------------------------------------------------
+        // User picker
+        // ------------------------------------------------------------------
+        const USER_META = {
+            default:  { name: 'John Smith',    role: 'Default User', avatar: 'JS', color: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' },
+            analyst:  { name: 'Sarah Johnson', role: 'Analyst',      avatar: 'SJ', color: 'linear-gradient(135deg,#10b981,#059669)' },
+            auditor:  { name: 'Michael Chen',  role: 'Auditor',      avatar: 'MC', color: 'linear-gradient(135deg,#f59e0b,#d97706)' },
+            admin:    { name: 'Emily Davis',   role: 'Compliance Officer', avatar: 'ED', color: 'linear-gradient(135deg,#ef4444,#dc2626)' },
+        };
+
+        function toggleUserDropdown() {
+            const wrapper = document.getElementById('userSelectWrapper');
+            const dropdown = document.getElementById('userDropdown');
+            const isOpen = dropdown.classList.contains('open');
+            if (isOpen) {
+                closeUserDropdown();
+            } else {
+                dropdown.classList.add('open');
+                wrapper.classList.add('open');
+            }
+        }
+
+        function closeUserDropdown() {
+            document.getElementById('userDropdown').classList.remove('open');
+            document.getElementById('userSelectWrapper').classList.remove('open');
+        }
+
+        function selectUser(value) {
+            if (USER_ID === value) { closeUserDropdown(); return; }
+            USER_ID = value;
+            const meta = USER_META[value] || { role: '', avatar: value.charAt(0).toUpperCase(), color: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' };
+
+            // Update trigger widget
+            const avatar = document.getElementById('userAvatar');
+            avatar.textContent = meta.avatar;
+            avatar.style.background = meta.color;
+            document.getElementById('userDisplayName').textContent = meta.name || value;
+            document.getElementById('userDisplayRole').textContent = meta.role;
+
+            // Update active state in dropdown
+            document.querySelectorAll('.user-dropdown-item').forEach(item => {
+                item.classList.toggle('active', item.dataset.value === value);
+            });
+
+            closeUserDropdown();
+
+            // Clear per-user UI state and show personalised welcome
+            document.getElementById('chatMessages').innerHTML = '';
+            document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
+            showWelcomeMessage(meta.name);
             loadDocuments();
             loadReports();
-            showToast(`Switched to user: ${USER_ID}`, 'info');
+            loadAuditLogs();
+            showToast(`Switched to ${meta.name}`, 'info');
         }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const wrapper = document.getElementById('userSelectWrapper');
+            const dropdown = document.getElementById('userDropdown');
+            if (wrapper && !wrapper.contains(e.target) && !dropdown.contains(e.target)) {
+                closeUserDropdown();
+            }
+        });
 
         // ------------------------------------------------------------------
         // KB Status & Standards
@@ -1145,13 +1626,19 @@
         }
 
         async function deleteDocument(docId) {
-            if (!confirm('Delete this document and its indexed chunks?')) return;
-            try {
-                await fetch(`/documents/${docId}?user_id=${USER_ID}`, { method: 'DELETE' });
-                loadDocuments();
-                loadAuditLogs();
-                showToast('Document deleted', 'info');
-            } catch (e) { console.error('Error deleting document:', e); }
+            showConfirmModal(
+                'Delete Document',
+                'Delete this document and all its indexed chunks? This cannot be undone.',
+                'Delete',
+                async () => {
+                    try {
+                        await fetch(`/documents/${docId}?user_id=${USER_ID}`, { method: 'DELETE' });
+                        loadDocuments();
+                        loadAuditLogs();
+                        showToast('Document deleted', 'info');
+                    } catch (e) { console.error('Error deleting document:', e); }
+                }
+            );
         }
 
         // ------------------------------------------------------------------
@@ -1213,25 +1700,61 @@
                 list.innerHTML = '';
                 reports.forEach(r => {
                     const d = new Date(r.timestamp);
+                    const dateStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
+                    const stdListHtml = (r.standards || []).map(s => `• ${escapeHtml(s)}`).join('<br>');
                     const div = document.createElement('div');
                     div.className = 'doc-item';
-                    div.innerHTML = `
-                        <span class="doc-name" title="${r.standards.join(', ')}">${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}</span>
-                        <span class="doc-meta">${r.standards.length} stds</span>
-                        <button class="delete-btn" onclick="downloadReport('${r.report_id}')" title="Download" style="color:var(--accent);">⬇</button>`;
                     div.style.cursor = 'pointer';
-                    div.onclick = (e) => { if (!e.target.classList.contains('delete-btn')) viewReport(r.report_id); };
+                    // #008: show standards in a hover tooltip
+                    div.innerHTML = `
+                        <span class="doc-name">${dateStr}</span>
+                        <span class="doc-meta std-badge" data-stds="${escapeHtml(stdListHtml)}" style="cursor:default">
+                            ${r.standards.length} stds
+                        </span>
+                        <button class="delete-btn" onclick="event.stopPropagation(); downloadReport('${r.report_id}')"
+                            title="Download report as Markdown" style="color:var(--accent); font-size:1rem;">📥</button>`;
+                    div.addEventListener('click', () => viewReport(r.report_id, r));
                     list.appendChild(div);
                 });
             } catch (e) { console.error('Error loading reports:', e); }
         }
 
-        async function viewReport(reportId) {
+        let _currentModalReportId = null;
+
+        // #005: show report in modal instead of appending to chat
+        async function viewReport(reportId, meta) {
             try {
                 const res = await fetch(`/reports/${reportId}?user_id=${USER_ID}`);
                 const data = await res.json();
-                if (data.report_text) addMessage('agent', data.report_text);
+                if (!data.report_text) { showToast('Report content not found', 'error'); return; }
+
+                _currentModalReportId = reportId;
+
+                // Populate meta bar (#008)
+                if (meta) {
+                    const d = new Date(meta.timestamp);
+                    const stdList = (meta.standards || []).join(' · ');
+                    document.getElementById('reportModalMeta').textContent =
+                        `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}  ·  ${stdList}`;
+                }
+
+                document.getElementById('reportModalContent').innerHTML = renderMarkdown(data.report_text);
+                document.getElementById('reportModal').style.display = 'flex';
+                document.getElementById('reportModalContent').scrollTop = 0;
             } catch (e) { showToast('Failed to load report', 'error'); }
+        }
+
+        function closeReportModal() {
+            document.getElementById('reportModal').style.display = 'none';
+            _currentModalReportId = null;
+        }
+
+        function handleReportOverlayClick(e) {
+            if (e.target === document.getElementById('reportModal')) closeReportModal();
+        }
+
+        function downloadCurrentModalReport() {
+            if (_currentModalReportId) downloadReport(_currentModalReportId);
         }
 
         function downloadReport(reportId) {
@@ -1243,7 +1766,7 @@
         // ------------------------------------------------------------------
         async function loadAuditLogs() {
             try {
-                const res = await fetch(`/audit/logs?limit=50`);
+                const res = await fetch(`/audit/logs?limit=50&user_id=${USER_ID}`);
                 const data = await res.json();
                 const list = document.getElementById('auditLogList');
                 const logs = data.logs || [];
@@ -1256,7 +1779,8 @@
                 list.innerHTML = '';
                 logs.forEach(log => {
                     const d = new Date(log.timestamp);
-                    const time = d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+                    const time = d.toLocaleDateString([], {day:'2-digit', month:'short'})
+                               + ', ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
                     const div = document.createElement('div');
                     div.className = 'audit-entry';
                     const badge = log.status === 'success' ? '<span class="audit-badge success">OK</span>' : '<span class="audit-badge failure">ERR</span>';
@@ -1356,13 +1880,22 @@
             if (!text) return '';
             let html = escapeHtml(text);
 
-            // Code blocks (triple backtick)
-            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => `<pre><code>${code.trim()}</code></pre>`);
+            // No-docs warning callout
+            html = html.replace(/^⚠ IMPORTANT — (.+)$/gm, (_, msg) =>
+                `<div class="no-docs-warning">⚠ <strong>No company documents uploaded.</strong> ${msg}</div>`
+            );
+
+            // Code blocks (triple backtick) — protect first so inner content isn't mangled
+            const codeBlocks = [];
+            html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
+                codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
+                return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
+            });
+
             // Inline code
             html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
-            // Bold
+            // Bold / italic
             html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            // Italic
             html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
             // Headers
             html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
@@ -1372,11 +1905,24 @@
             html = html.replace(/^---$/gm, '<hr>');
             // Blockquote
             html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
-            // Unordered lists
-            html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
-            html = html.replace(/(<li>.*<\/li>\n?)+/g, match => `<ul>${match}</ul>`);
-            // Ordered lists
-            html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+            // Lists — collapse blank lines between list items before converting,
+            // so \n\n between bullets doesn't produce stray <p> tags later.
+            html = html.replace(/((?:^[\-\*] .+$\n?)(?:\n(?=[\-\*] ))?)+/gm, block => {
+                const items = block.split('\n')
+                    .filter(l => /^[\-\*] /.test(l))
+                    .map(l => `<li>${l.replace(/^[\-\*] /, '')}</li>`)
+                    .join('');
+                return `<ul>${items}</ul>`;
+            });
+            html = html.replace(/((?:^\d+\. .+$\n?)(?:\n(?=\d+\. ))?)+/gm, block => {
+                const items = block.split('\n')
+                    .filter(l => /^\d+\. /.test(l))
+                    .map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`)
+                    .join('');
+                return `<ol>${items}</ol>`;
+            });
+
             // Tables
             html = html.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)*)/g, (_, header, body) => {
                 const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
@@ -1386,22 +1932,23 @@
                 }).join('');
                 return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
             });
-            // Paragraphs
-            html = html.replace(/\n\n/g, '</p><p>');
+
+            // Paragraphs — only split on double newlines that aren't already inside block elements
+            html = html.replace(/\n\n+/g, '</p><p>');
             html = html.replace(/\n/g, '<br>');
             html = `<p>${html}</p>`;
-            html = html.replace(/<p><\/p>/g, '');
-            html = html.replace(/<p>(<h[123]>)/g, '$1');
-            html = html.replace(/(<\/h[123]>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<ul>)/g, '$1');
-            html = html.replace(/(<\/ul>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<table>)/g, '$1');
-            html = html.replace(/(<\/table>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<pre>)/g, '$1');
-            html = html.replace(/(<\/pre>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<hr>)<\/p>/g, '$1');
-            html = html.replace(/<p>(<blockquote>)/g, '$1');
-            html = html.replace(/(<\/blockquote>)<\/p>/g, '$1');
+
+            // Clean up: remove empty <p> and unwrap block elements from <p>
+            html = html.replace(/<p>\s*<\/p>/g, '');
+            ['h1','h2','h3','ul','ol','table','pre','hr','blockquote'].forEach(tag => {
+                html = html.replace(new RegExp(`<p>(<${tag}[^>]*>)`, 'g'), '$1');
+                html = html.replace(new RegExp(`(</${tag}>)<\\/p>`, 'g'), '$1');
+            });
+
+            // Restore code blocks
+            codeBlocks.forEach((block, i) => {
+                html = html.replace(`%%CODEBLOCK_${i}%%`, block);
+            });
 
             return html;
         }
@@ -1442,7 +1989,11 @@
         // Session
         // ------------------------------------------------------------------
         async function resetSession() {
-            if (!confirm('Reset the current session? This will clear conversation history.')) return;
+            showConfirmModal(
+                'Reset Session',
+                'Clear the current conversation history and reset the agent session?',
+                'Reset',
+                async () => {
             try {
                 await fetch('/reset', {
                     method: 'POST',
@@ -1450,10 +2001,69 @@
                     body: JSON.stringify({ user_id: USER_ID })
                 });
                 document.getElementById('chatMessages').innerHTML = '';
-                addMessage('agent', 'Session reset. Conversation history cleared.');
+                document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
+                showWelcomeMessage(USER_META[USER_ID].name);
                 loadAuditLogs();
                 showToast('Session reset', 'info');
             } catch (e) { showToast('Failed to reset session', 'error'); }
+                }
+            );
+        }
+
+        // ------------------------------------------------------------------
+        // Standards tooltip (fixed positioning to avoid sidebar clipping)
+        // ------------------------------------------------------------------
+        const _stdTooltipEl = (() => {
+            const el = document.createElement('div');
+            el.className = 'std-tooltip-wrapper';
+            const tip = document.createElement('span');
+            tip.className = 'std-tooltip';
+            tip.style.display = 'none';
+            el.appendChild(tip);
+            document.body.appendChild(el);
+            return tip;
+        })();
+
+        document.addEventListener('mouseover', e => {
+            const badge = e.target.closest('.std-badge');
+            if (!badge) return;
+            const rect = badge.getBoundingClientRect();
+            _stdTooltipEl.innerHTML = badge.dataset.stds || '';
+            _stdTooltipEl.style.display = 'block';
+            // Position above the badge, aligned to its right edge
+            const tipW = _stdTooltipEl.offsetWidth;
+            let left = rect.right - tipW;
+            if (left < 8) left = 8;
+            _stdTooltipEl.style.left = left + 'px';
+            _stdTooltipEl.style.top = (rect.top - _stdTooltipEl.offsetHeight - 6) + 'px';
+        });
+
+        document.addEventListener('mouseout', e => {
+            if (e.target.closest('.std-badge')) _stdTooltipEl.style.display = 'none';
+        });
+
+        // ------------------------------------------------------------------
+        // Confirmation Modal helpers (#007)
+        // ------------------------------------------------------------------
+        let _confirmCallback = null;
+
+        function showConfirmModal(title, message, confirmLabel, onConfirm) {
+            document.getElementById('confirmModalTitle').textContent = title;
+            document.getElementById('confirmModalMessage').textContent = message;
+            const btn = document.getElementById('confirmModalBtn');
+            btn.textContent = confirmLabel;
+            _confirmCallback = onConfirm;
+            btn.onclick = () => { const cb = _confirmCallback; closeConfirmModal(); if (cb) cb(); };
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirmModal').style.display = 'none';
+            _confirmCallback = null;
+        }
+
+        function handleConfirmOverlayClick(e) {
+            if (e.target === document.getElementById('confirmModal')) closeConfirmModal();
         }
 
         // ------------------------------------------------------------------
