@@ -19,12 +19,7 @@ load_dotenv()
 
 
 class EvaluationEngine:
-    """Evaluates a company's compliance posture against regulatory standards.
-    
-    Uses RAG to retrieve relevant regulatory content and company documents,
-    then uses the LLM to perform structured gap analysis and generate
-    compliance reports.
-    """
+    """Runs compliance gap analysis against uploaded company documents."""
 
     def __init__(self, rag_pipeline: RAGPipeline = None):
         self.rag_pipeline = rag_pipeline or RAGPipeline()
@@ -44,19 +39,7 @@ class EvaluationEngine:
         country: str = "",
         specific_query: str = "",
     ) -> str:
-        """Run a full compliance evaluation for a user's uploaded documents.
-        
-        Args:
-            user_id: User whose company documents to evaluate.
-            standards: List of standards to evaluate against
-                       (e.g. ["ISO 27001", "GDPR"]).
-            industry: Company's industry for context.
-            country: Country/jurisdiction for locale-specific rules.
-            specific_query: Optional specific focus area for the evaluation.
-            
-        Returns:
-            Formatted markdown evaluation report.
-        """
+        """Evaluate a user's documents against the given standards and return a markdown report."""
         self.logger.info(
             f"Starting compliance evaluation for user: {user_id}"
         )
@@ -67,7 +50,6 @@ class EvaluationEngine:
                 "HIPAA", "PCI DSS", "COBIT"
             ]
 
-        # 1. Retrieve company documents via RAG
         company_query = (
             "security policies, compliance, governance, controls, "
             "risk management, data protection, access control, "
@@ -80,21 +62,11 @@ class EvaluationEngine:
             user_id, company_query
         )
 
-        # 2. Retrieve relevant regulatory knowledge for each standard
-        standards_query = (
-            f"Requirements, controls, and compliance criteria for: "
-            f"{', '.join(standards)}"
-        )
-        if industry:
-            standards_query += f" in the {industry} industry"
-        if country:
-            standards_query += f" applicable in {country}"
-
-        regulatory_context = self.rag_pipeline.retrieve_knowledge_only(
-            standards_query
+        # one query per standard avoids crowding in combined similarity search
+        regulatory_context = self._retrieve_per_standard_context(
+            standards, industry, country
         )
 
-        # 3. Send to LLM for evaluation
         report_text = self._generate_evaluation(
             company_context=company_context,
             regulatory_context=regulatory_context,
@@ -107,6 +79,24 @@ class EvaluationEngine:
         self.logger.info("Compliance evaluation completed")
         return report_text
 
+    def _retrieve_per_standard_context(
+        self,
+        standards: List[str],
+        industry: str,
+        country: str,
+    ) -> str:
+        """Query the knowledge base once per standard to avoid similarity crowding."""
+        sections = []
+        for std in standards:
+            query = f"{std} requirements controls compliance obligations"
+            if industry:
+                query += f" {industry}"
+            if country:
+                query += f" {country}"
+            chunk = self.rag_pipeline.retrieve_knowledge_only(query)
+            sections.append(f"=== {std} ===\n{chunk}")
+        return "\n\n".join(sections)
+
     def _generate_evaluation(
         self,
         company_context: str,
@@ -116,7 +106,7 @@ class EvaluationEngine:
         country: str,
         specific_query: str,
     ) -> str:
-        """Use LLM to generate the compliance evaluation report."""
+        """Build the evaluation prompt and call the LLM."""
 
         system_prompt = """You are an expert compliance and security auditor. You are evaluating a company's security and compliance posture based on their uploaded documents against international regulatory standards.
 
@@ -156,16 +146,20 @@ Specific, actionable recommendations ordered by priority. For each:
 - Standard reference
 - Expected effort (Quick Win / Short-term / Medium-term / Long-term)
 
-IMPORTANT RULES:
-- ALWAYS cite the specific standard clause, article, or requirement number for EVERY finding
-- Be specific and actionable in recommendations
-- Base your analysis ONLY on the provided company documents and regulatory context
-- If company documents are insufficient, note what information is missing
-- Assign risk levels based on potential impact and likelihood of regulatory action"""
+CRITICAL RULES:
+- You MUST include a section for EVERY standard listed in "Standards to evaluate against". Do not skip any standard, even if the retrieved context is limited — in that case note the gap explicitly.
+- ALWAYS cite the specific standard clause, article, section, or requirement number for EVERY finding (e.g. "ISO 27001 Clause 6.1.2", "SBP Information Security Circular 2017 Section 3.2", "GDPR Article 32").
+- Be specific and actionable in recommendations.
+- Base your analysis ONLY on the provided company documents and regulatory context.
+- If company documents are absent or insufficient for a standard, explicitly state "No company documentation found for this area" and recommend what should be produced.
+- Assign risk levels (Critical / High / Medium / Low) based on potential regulatory impact and likelihood of enforcement."""
 
-        user_prompt = f"""Evaluate the following company's compliance posture:
+        standards_list = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(standards))
+        user_prompt = f"""Evaluate the following company's compliance posture.
 
-**Standards to evaluate against**: {', '.join(standards)}
+**Standards to evaluate against (you MUST cover ALL of these)**:
+{standards_list}
+
 **Industry**: {industry or 'Not specified'}
 **Country/Jurisdiction**: {country or 'Not specified'}
 {f'**Specific Focus**: {specific_query}' if specific_query else ''}
@@ -173,10 +167,10 @@ IMPORTANT RULES:
 --- COMPANY DOCUMENTS ---
 {company_context}
 
---- REGULATORY KNOWLEDGE BASE ---
+--- REGULATORY KNOWLEDGE BASE (organised per standard) ---
 {regulatory_context}
 
-Produce a detailed, structured compliance evaluation report following the format specified in your instructions. Remember to cite specific standard clauses for every finding."""
+Produce a detailed, structured compliance evaluation report. You MUST explicitly address every standard listed above — include its name as a sub-heading under each section where relevant. Cite specific clause/article/section numbers for every finding."""
 
         try:
             response = completion(

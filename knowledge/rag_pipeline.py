@@ -72,6 +72,17 @@ class RAGPipeline:
         """Format retrieved results into a structured context block."""
         parts = []
 
+        # Prominently flag missing company docs at the very top so the LLM
+        # cannot overlook it when framing its response.
+        if not company_results:
+            parts.append(
+                "⚠ IMPORTANT — NO COMPANY DOCUMENTS AVAILABLE: "
+                "This user has not uploaded any company documents. "
+                "You MUST inform the user of this at the start of your response. "
+                "Do NOT answer as if you have reviewed their actual policies or documents. "
+                "Base your response solely on the regulatory knowledge base below."
+            )
+
         if kb_results:
             parts.append(
                 self._format_section("Regulatory Knowledge Base", kb_results)
@@ -95,6 +106,13 @@ class RAGPipeline:
     ) -> str:
         """Format a section of retrieved results with source citations."""
         if not results:
+            if "Company Documents" in title:
+                return (
+                    "[No company documents have been uploaded by this user. "
+                    "Responses will be based solely on the regulatory knowledge base. "
+                    "Please upload your company's policy documents to enable "
+                    "document-specific analysis and gap assessments.]"
+                )
             return f"[No relevant results found in {title}.]"
 
         lines = [f"--- {title} ---"]
