@@ -113,7 +113,6 @@ graph TD
 │
 ├── web_app.py                # Flask web server and REST API
 ├── main.py                   # CLI entry point (interactive and batch modes)
-├── config.py                 # Centralised configuration from environment variables
 └── requirements.txt
 ```
 
@@ -369,7 +368,7 @@ The system retrieves your uploaded documents and the relevant regulatory standar
 
 ## Configuration Reference
 
-All settings are controlled via environment variables. The `Config` class in [config.py](config.py) provides defaults for every value.
+All settings are controlled via environment variables with sensible defaults built into each component.
 
 | Variable | Default | Description |
 |---|---|---|

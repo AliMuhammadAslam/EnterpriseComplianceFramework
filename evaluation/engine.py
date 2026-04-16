@@ -5,14 +5,6 @@ from datetime import datetime
 from litellm import completion
 from utils.logger import logger_instance
 from knowledge.rag_pipeline import RAGPipeline
-from evaluation.report import (
-    EvaluationReport,
-    ComplianceArea,
-    Gap,
-    Recommendation,
-    RiskItem,
-    format_report,
-)
 from dotenv import load_dotenv
 
 load_dotenv()
