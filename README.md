@@ -1,5 +1,14 @@
 # Compliance RAG Agent Framework
 
+<p align="left">
+  <img src="https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/Flask-000000?style=for-the-badge&logo=flask&logoColor=white" alt="Flask">
+  <img src="https://img.shields.io/badge/Pydantic-E92063?style=for-the-badge&logo=pydantic&logoColor=white" alt="Pydantic">
+  <img src="https://img.shields.io/badge/OpenAI-412991?style=for-the-badge&logo=openai&logoColor=white" alt="OpenAI">
+  <img src="https://img.shields.io/badge/LiteLLM-F97316?style=for-the-badge" alt="LiteLLM">
+  <img src="https://img.shields.io/badge/ChromaDB-1E1E2E?style=for-the-badge" alt="ChromaDB">
+</p>
+
 An AI-powered compliance evaluation platform that helps organisations assess their security and regulatory posture against major industry standards. Built on a structured Planning + Execution agent architecture with a RAG (Retrieval-Augmented Generation) pipeline, company document ingestion, and a structured compliance evaluation engine.
 
 ---
