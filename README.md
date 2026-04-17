@@ -355,11 +355,6 @@ The system retrieves your uploaded documents and the relevant regulatory standar
 
 ## Extending the Framework
 
-### Adding a New Tool
-1. Create a new file in `tools/available/` inheriting from `BaseTool`
-2. Implement `_execute()` and `get_input_schema()`
-3. The `ToolManager` auto-discovers and registers it on startup
-
 ### Adding a New Regulatory Standard
 1. Add a `.md` or `.txt` file to `knowledge_data/`
 2. Restart the application — it detects the change and re-ingests automatically
