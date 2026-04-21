@@ -372,14 +372,32 @@
         .standards-list { max-height: 200px; overflow-y: auto; }
 
         .standard-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             padding: 0.35rem 0;
             border-bottom: 1px solid rgba(255,255,255,0.04);
             font-size: 0.73rem;
             color: rgba(255,255,255,0.75);
         }
 
+        .standard-item-text { flex: 1; min-width: 0; }
         .standard-item .std-title { font-weight: 500; }
         .standard-item .std-file { color: var(--text-muted); font-size: 0.65rem; }
+
+        .std-download-btn {
+            background: none;
+            border: none;
+            color: rgba(59,130,246,0.6);
+            cursor: pointer;
+            font-size: 0.85rem;
+            margin-left: 0.4rem;
+            flex-shrink: 0;
+            transition: color var(--transition);
+            padding: 0.1rem 0.2rem;
+        }
+
+        .std-download-btn:hover { color: var(--accent); }
 
         /* Session bar */
         .session-bar {
@@ -843,7 +861,17 @@
 
         .toast.success { background: var(--success); color: white; }
         .toast.error { background: var(--error); color: white; }
-        .toast.info { background: var(--accent); color: white; }
+        .toast.info { background: var(--warning); color: white; }
+
+        .info-card {
+            display: block;
+            background: var(--warning-light);
+            border: 1px solid var(--warning);
+            border-radius: 8px;
+            padding: 14px 16px;
+            color: var(--text-primary);
+            line-height: 1.6;
+        }
 
         @keyframes toastIn { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
         @keyframes toastOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-10px); } }
@@ -1507,6 +1535,12 @@
             // Clear per-user UI state and show personalised welcome
             document.getElementById('chatMessages').innerHTML = '';
             document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
+
+            // Reset standards checkboxes to defaults
+            document.querySelectorAll('#standardsGrid input[type="checkbox"]').forEach(cb => {
+                cb.checked = DEFAULT_CHECKED_STANDARDS.includes(cb.value);
+            });
+
             showWelcomeMessage(meta.name);
             loadDocuments();
             loadReports();
@@ -1551,12 +1585,28 @@
                 data.standards.forEach(s => {
                     const div = document.createElement('div');
                     div.className = 'standard-item';
-                    div.innerHTML = `<div class="std-title">${s.title}</div><div class="std-file">${s.filename} · ${(s.size_bytes / 1024).toFixed(1)} KB</div>`;
+                    div.innerHTML = `
+                        <div class="standard-item-text">
+                            <div class="std-title">${s.title}</div>
+                            <div class="std-file">${s.filename} · ${(s.size_bytes / 1024).toFixed(1)} KB</div>
+                        </div>
+                        <button class="std-download-btn" title="Download ${s.title}" onclick="downloadKnowledgeDoc('${s.filename}')">📥</button>`;
                     list.appendChild(div);
                 });
             } catch (e) {
                 console.error('Error loading standards:', e);
             }
+        }
+
+        function downloadKnowledgeDoc(filename) {
+            const a = document.createElement('a');
+            a.href = `/knowledge/standards/${encodeURIComponent(filename)}/download?user_id=${USER_ID}`;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            showToast(`Downloading ${filename}`, 'info');
         }
 
         // ------------------------------------------------------------------
@@ -1663,7 +1713,26 @@
                 const data = await res.json();
                 showTyping(false);
 
-                if (data.error) {
+                if (data.warning) {
+                    const container = document.getElementById('chatMessages');
+                    const div = document.createElement('div');
+                    div.className = 'message agent-message';
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+                    div.innerHTML = `
+                        <div class="msg-header">Agent</div>
+                        <div class="msg-bubble">
+                            <div class="info-card">
+                                ℹ️ <strong>No documents uploaded yet</strong><br><br>
+                                To run a compliance evaluation, kindly upload your company documents first.<br><br>
+                                Go to the <strong>Company Documents</strong> section to get started.
+                            </div>
+                        </div>
+                        <div class="msg-time">${timeStr}</div>`;
+                    container.appendChild(div);
+                    container.scrollTop = container.scrollHeight;
+                    showToast('Upload documents before running an evaluation', 'info');
+                } else if (data.error) {
                     addMessage('agent', `**Error:** ${data.error}`);
                     showToast(data.error, 'error');
                 } else {
@@ -1758,7 +1827,13 @@
         }
 
         function downloadReport(reportId) {
-            window.open(`/reports/${reportId}/download?user_id=${USER_ID}`, '_blank');
+            const a = document.createElement('a');
+            a.href = `/reports/${reportId}/download?user_id=${USER_ID}`;
+            a.download = `report_${reportId}.md`;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
         }
 
         // ------------------------------------------------------------------
@@ -1799,7 +1874,13 @@
         }
 
         function exportAudit() {
-            window.open('/audit/export', '_blank');
+            const a = document.createElement('a');
+            a.href = '/audit/export';
+            a.download = 'audit_log.csv';
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
             showToast('Audit log exported', 'info');
         }
 
