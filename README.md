@@ -146,6 +146,7 @@ Every system action is recorded to `audit_logs/audit_log.jsonl` via the `AuditLo
 | `DOCUMENT_DELETE` | Document deleted from the system |
 | `EVALUATION_RUN` | Compliance evaluation executed |
 | `REPORT_DOWNLOAD` | Evaluation report downloaded |
+| `KNOWLEDGE_DOWNLOAD` | Regulatory knowledge document downloaded |
 | `SESSION_RESET` | User session reset |
 | `KNOWLEDGE_INGEST` | Knowledge base ingested or re-ingested |
 | `SYSTEM_START` | Application started |
@@ -349,6 +350,7 @@ The system retrieves your uploaded documents and the relevant regulatory standar
 | `GET` | `/status` | System component status |
 | `GET` | `/knowledge/status` | Regulatory knowledge base status |
 | `GET` | `/knowledge/standards` | List all loaded regulatory standards with metadata |
+| `GET` | `/knowledge/standards/<filename>/download?user_id=` | Download a regulatory standard document as a Markdown file |
 | `POST` | `/reset` | Reset the current session memory |
 
 ---

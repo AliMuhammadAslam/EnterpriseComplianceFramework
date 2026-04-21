@@ -246,11 +246,11 @@ def evaluate_compliance():
         doc_count = orchestrator.upload_manager.get_user_doc_count(user_id)
         if doc_count == 0:
             return jsonify({
-                "error": (
+                "warning": (
                     "No company documents found. Please upload your "
                     "company documents first before running an evaluation."
                 )
-            }), 400
+            }), 200
 
         report = orchestrator.evaluate_compliance(
             user_id=user_id,
@@ -443,6 +443,40 @@ def knowledge_standards():
     try:
         standards = orchestrator.knowledge_base.list_standards()
         return jsonify({"standards": standards})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/knowledge/standards/<filename>/download")
+def download_knowledge_standard(filename):
+    """Download a regulatory knowledge document as a Markdown file."""
+    try:
+        # Validate against the known standards list to prevent path traversal
+        known = {s["filename"] for s in orchestrator.knowledge_base.list_standards()}
+        if filename not in known:
+            return jsonify({"error": "Standard not found"}), 404
+
+        knowledge_path = os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge_data")
+        filepath = os.path.join(knowledge_path, filename)
+
+        with open(filepath, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        audit.log(
+            action="KNOWLEDGE_DOWNLOAD",
+            user_id=request.args.get("user_id", "anonymous"),
+            resource_type="knowledge",
+            resource_id=filename,
+            ip_address=_get_client_ip(),
+            status="success",
+        )
+
+        return app.response_class(
+            response=content,
+            status=200,
+            mimetype="text/markdown",
+            headers={"Content-Disposition": f"attachment; filename={filename}"},
+        )
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
