@@ -13,11 +13,7 @@ load_dotenv()
 
 
 class UploadManager:
-    """Manages company document uploads, parsing, chunking, and vector storage.
-    
-    Each user's documents are stored in a separate namespace in the vector
-    store (company_docs_{user_id}) and tracked via a JSON manifest.
-    """
+    """Handles document uploads: validation, parsing, chunking, and storage."""
 
     def __init__(self, vector_store: VectorStore = None):
         self.upload_dir = os.getenv("UPLOAD_DIR", "./uploads")
@@ -33,17 +29,8 @@ class UploadManager:
     def upload_document(
         self, file_path: str, original_filename: str, user_id: str
     ) -> Dict[str, Any]:
-        """Full upload pipeline: validate, parse, chunk, embed, store.
-        
-        Args:
-            file_path: Path to the uploaded file on disk.
-            original_filename: Original filename from the upload.
-            user_id: User identifier for namespace isolation.
-            
-        Returns:
-            Dict with upload status and document metadata.
-        """
-        # Validate extension
+        """Validate, parse, chunk, embed, and store an uploaded document."""
+        # Check extension
         ext = os.path.splitext(original_filename)[1].lower().lstrip(".")
         if ext not in self.allowed_extensions:
             raise ValueError(
@@ -51,7 +38,7 @@ class UploadManager:
                 f"Allowed: {', '.join(self.allowed_extensions)}"
             )
 
-        # Validate size
+        # Check file size
         file_size = os.path.getsize(file_path)
         if file_size > self.max_size_mb * 1024 * 1024:
             raise ValueError(
@@ -65,12 +52,10 @@ class UploadManager:
             f"(user: {user_id}, doc_id: {doc_id})"
         )
 
-        # 1. Parse file to text
         text = self.parser.parse_file(file_path)
         if not text.strip():
             raise ValueError("Document appears to be empty or unreadable")
 
-        # 2. Chunk the text
         chunks = self.chunker.chunk_text(
             text,
             metadata={
@@ -82,7 +67,6 @@ class UploadManager:
             },
         )
 
-        # 3. Store chunks in user-specific vector store
         documents = [c["text"] for c in chunks]
         metadatas = [c["metadata"] for c in chunks]
         ids = [f"{doc_id}_chunk_{i}" for i in range(len(chunks))]
@@ -94,18 +78,15 @@ class UploadManager:
             ids=ids,
         )
 
-        # 4. Save to user directory and update manifest
         user_dir = os.path.join(self.upload_dir, user_id)
         os.makedirs(user_dir, exist_ok=True)
 
-        # Copy file to user's upload directory
         stored_filename = f"{doc_id}_{original_filename}"
         stored_path = os.path.join(user_dir, stored_filename)
         if file_path != stored_path:
             import shutil
             shutil.copy2(file_path, stored_path)
 
-        # Update manifest
         doc_record = {
             "doc_id": doc_id,
             "original_filename": original_filename,

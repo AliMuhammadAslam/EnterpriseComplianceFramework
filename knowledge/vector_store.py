@@ -9,12 +9,7 @@ load_dotenv()
 
 
 class VectorStore:
-    """ChromaDB-backed vector store with namespace isolation.
-    
-    Uses separate collections for:
-    - 'regulatory_knowledge': global compliance/regulatory knowledge base
-    - 'company_docs_{user_id}': per-user uploaded company documents
-    """
+    """ChromaDB wrapper with separate collections for the regulatory KB and per-user docs."""
 
     def __init__(self, persist_directory: str = None):
         self.persist_directory = persist_directory or os.getenv(
@@ -33,8 +28,6 @@ class VectorStore:
             name=name,
             metadata={"hnsw:space": "cosine"}
         )
-
-    # ---- Knowledge Base (global) ----
 
     def add_knowledge_documents(
         self,
@@ -80,8 +73,6 @@ class VectorStore:
         """Return number of documents in the knowledge base."""
         collection = self._get_or_create_collection("regulatory_knowledge")
         return collection.count()
-
-    # ---- Company Documents (per-user) ----
 
     def add_company_documents(
         self,
@@ -143,8 +134,6 @@ class VectorStore:
             self.logger.info(f"Deleted collection: {collection_name}")
         except Exception as e:
             self.logger.error(f"Error deleting collection: {e}")
-
-    # ---- Helpers ----
 
     def _format_results(self, results: dict) -> List[Dict[str, Any]]:
         """Format ChromaDB query results into a clean list of dicts."""

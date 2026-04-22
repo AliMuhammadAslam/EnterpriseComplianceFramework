@@ -15,19 +15,8 @@ class PerceptionOutput(BaseModel):
 
 
 class Perception:
-    """Classifies user input into one of six intent categories.
-
-    Uses the LLM for classification, with a keyword-based fallback
-    in case the LLM call fails.
-
-    Intent categories:
-        compliance_evaluation  — evaluate/audit compliance posture
-        document_query         — questions about uploaded company documents
-        information_seeking    — factual questions about standards/regulations
-        problem_solving        — analysis or reasoning tasks
-        planning               — requests for step-by-step procedures
-        general_query          — casual conversation or greetings
-    """
+    """Classifies user input into one of six intent categories using the LLM,
+    with keyword fallback if the LLM call fails."""
 
     VALID_INTENTS = [
         "compliance_evaluation",

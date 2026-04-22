@@ -8,11 +8,7 @@ load_dotenv()
 
 
 class RAGPipeline:
-    """Retrieval-Augmented Generation pipeline.
-    
-    Retrieves relevant context from both the regulatory knowledge base
-    and user-specific company documents, then formats it for LLM injection.
-    """
+    """Retrieves context from the regulatory KB and user documents for LLM injection."""
 
     def __init__(self, vector_store: VectorStore = None):
         self.vector_store = vector_store or VectorStore()
@@ -23,26 +19,17 @@ class RAGPipeline:
     def retrieve_context(
         self, query: str, user_id: Optional[str] = None
     ) -> str:
-        """Retrieve relevant context from knowledge base and company docs.
-        
-        Always queries the regulatory knowledge base. If user_id is provided,
-        also queries the user's company documents.
-        
-        Returns formatted context string ready for LLM prompt injection.
-        """
+        """Query the regulatory KB and the user's company docs, return formatted context."""
         self.logger.info(f"Retrieving context for query: {query[:80]}...")
 
-        # 1. Always retrieve from regulatory knowledge base
         kb_results = self.vector_store.query_knowledge(query, top_k=self.top_k)
 
-        # 2. Optionally retrieve from user's company documents
         company_results = []
         if user_id:
             company_results = self.vector_store.query_company_documents(
                 user_id, query, top_k=self.top_k
             )
 
-        # 3. Format and return
         context = self._format_context(kb_results, company_results)
         self.logger.info(
             f"Retrieved {len(kb_results)} KB chunks, "
