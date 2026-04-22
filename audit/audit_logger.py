@@ -71,20 +71,7 @@ class AuditLogger:
         ip_address: str = "",
         status: str = "success",
     ) -> AuditEntry:
-        """Record an audit event.
-
-        Args:
-            action: Action type from AUDIT_ACTIONS.
-            user_id: Identifier of the user performing the action.
-            resource_type: Type of resource affected (e.g., 'document', 'session').
-            resource_id: Identifier of the affected resource.
-            details: Additional context about the event.
-            ip_address: Client IP address if available.
-            status: Outcome of the action ('success' or 'failure').
-
-        Returns:
-            The created AuditEntry.
-        """
+        """Append an audit event to the log file."""
         entry = AuditEntry(
             event_id=str(uuid.uuid4())[:12],
             timestamp=datetime.now().isoformat(),
@@ -116,24 +103,9 @@ class AuditLogger:
         limit: int = 100,
         offset: int = 0,
     ) -> List[Dict[str, Any]]:
-        """Query audit logs with optional filtering.
-
-        Args:
-            user_id: Filter by user.
-            action: Filter by action type.
-            resource_type: Filter by resource type.
-            start_date: ISO datetime string for range start (inclusive).
-            end_date: ISO datetime string for range end (inclusive).
-            status: Filter by status ('success' or 'failure').
-            limit: Maximum entries to return.
-            offset: Number of entries to skip.
-
-        Returns:
-            List of matching audit entries as dictionaries.
-        """
+        """Return audit entries matching the given filters, newest first."""
         entries = self._read_all_entries()
 
-        # Apply filters
         if user_id:
             entries = [e for e in entries if e["user_id"] == user_id]
         if action:
@@ -147,7 +119,6 @@ class AuditLogger:
         if end_date:
             entries = [e for e in entries if e["timestamp"] <= end_date]
 
-        # Sort newest first, apply pagination
         entries.sort(key=lambda x: x["timestamp"], reverse=True)
         return entries[offset:offset + limit]
 
@@ -169,15 +140,7 @@ class AuditLogger:
         }
 
     def export_csv(self, filepath: str, **filters) -> str:
-        """Export filtered audit entries to a CSV file.
-
-        Args:
-            filepath: Output CSV path.
-            **filters: Keyword arguments passed to query().
-
-        Returns:
-            Path to the exported CSV file.
-        """
+        """Export filtered audit entries to a CSV file and return the path."""
         entries = self.query(**filters, limit=10000)
         if not entries:
             return filepath
@@ -216,6 +179,5 @@ class AuditLogger:
         except Exception as e:
             self.logger.error(f"Failed to read audit log: {e}")
 
-        # Sort newest first
         entries.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         return entries

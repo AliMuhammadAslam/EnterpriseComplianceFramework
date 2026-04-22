@@ -8,11 +8,7 @@ load_dotenv()
 
 
 class EmbeddingService:
-    """Generates text embeddings using OpenAI's embedding models.
-    
-    Uses litellm-compatible OpenAI client. Can be swapped to other
-    providers (Gemini, Cohere, etc.) by changing the client and model.
-    """
+    """Generates text embeddings via the OpenAI embeddings API."""
 
     def __init__(self, model: str = None):
         self.model = model or os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")

@@ -18,15 +18,7 @@ class DocumentChunker:
         text: str,
         metadata: Dict[str, Any] = None,
     ) -> List[Dict[str, Any]]:
-        """Split text into overlapping chunks with metadata.
-        
-        Args:
-            text: Full document text.
-            metadata: Base metadata to attach to each chunk.
-            
-        Returns:
-            List of dicts with 'text' and 'metadata' keys.
-        """
+        """Split text into overlapping word-count chunks, each with attached metadata."""
         if not text or not text.strip():
             return []
 

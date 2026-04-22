@@ -9,13 +9,7 @@ load_dotenv()
 
 
 class KnowledgeBase:
-    """Manages the regulatory/compliance knowledge base.
-    
-    Reads structured markdown/text files from the knowledge_data directory,
-    chunks and embeds them, and stores in the vector store. Designed to be
-    extensible — simply add new .md or .txt files to the knowledge_data
-    directory and call ingest().
-    """
+    """Loads and manages regulatory/compliance documents in the vector store."""
 
     def __init__(self, vector_store: VectorStore = None):
         self.vector_store = vector_store or VectorStore()
@@ -34,11 +28,7 @@ class KnowledgeBase:
         return self.vector_store.knowledge_count() > 0
 
     def ingest(self, force: bool = False):
-        """Ingest all documents from the knowledge data directory.
-        
-        Args:
-            force: If True, re-ingest even if already populated.
-        """
+        """Read all .md and .txt files from knowledge_data and load them into the vector store."""
         if self.is_populated() and not force:
             self.logger.info(
                 "Knowledge base already populated, skipping ingestion"
@@ -86,7 +76,6 @@ class KnowledgeBase:
                 self.logger.error(f"  Error processing {filename}: {e}")
 
         if all_chunks:
-            # Batch insert — ChromaDB handles batching internally
             batch_size = 50
             for start in range(0, len(all_chunks), batch_size):
                 end = start + batch_size
@@ -104,11 +93,7 @@ class KnowledgeBase:
     def _chunk_document(
         self, content: str, filename: str
     ) -> List[Dict[str, Any]]:
-        """Split a document into overlapping chunks with metadata.
-        
-        Uses section-aware chunking: splits on markdown headings first,
-        then by character count within sections.
-        """
+        """Split document into chunks, preserving markdown section boundaries."""
         chunks = []
         current_section = "General"
 
