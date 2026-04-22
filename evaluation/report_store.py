@@ -7,12 +7,7 @@ from utils.logger import logger_instance
 
 
 class ReportStore:
-    """Persists compliance evaluation reports to disk.
-
-    Each report is stored as a JSON file containing the report metadata
-    and the full markdown report text. Reports are organized by user_id
-    in the reports directory.
-    """
+    """Saves and retrieves compliance evaluation reports stored per user."""
 
     def __init__(self, reports_dir: str = None):
         self.reports_dir = reports_dir or os.getenv("REPORTS_DIR", "./reports")
@@ -27,18 +22,7 @@ class ReportStore:
         industry: str = "",
         country: str = "",
     ) -> Dict[str, Any]:
-        """Save an evaluation report and return its metadata.
-
-        Args:
-            user_id: Identifier of the user who ran the evaluation.
-            report_text: Full markdown text of the report.
-            standards: List of standards evaluated.
-            industry: Industry context for the evaluation.
-            country: Country/jurisdiction context.
-
-        Returns:
-            Dict containing report_id, timestamp, and metadata.
-        """
+        """Save an evaluation report and return its metadata."""
         report_id = str(uuid.uuid4())[:8]
         timestamp = datetime.now().isoformat()
 
@@ -70,14 +54,7 @@ class ReportStore:
         }
 
     def list_reports(self, user_id: str) -> List[Dict[str, Any]]:
-        """List all saved reports for a user (metadata only, no report text).
-
-        Args:
-            user_id: Identifier of the user.
-
-        Returns:
-            List of report metadata dicts sorted by timestamp descending.
-        """
+        """Return metadata for all saved reports, newest first."""
         user_dir = os.path.join(self.reports_dir, user_id)
         if not os.path.exists(user_dir):
             return []
@@ -103,15 +80,7 @@ class ReportStore:
         return reports
 
     def get_report(self, user_id: str, report_id: str) -> Optional[Dict[str, Any]]:
-        """Retrieve a specific report including full text.
-
-        Args:
-            user_id: Identifier of the user.
-            report_id: Identifier of the report.
-
-        Returns:
-            Full report record or None if not found.
-        """
+        """Retrieve a specific report including full text, or None if not found."""
         filepath = os.path.join(self.reports_dir, user_id, f"{report_id}.json")
         if not os.path.exists(filepath):
             return None
@@ -120,15 +89,7 @@ class ReportStore:
             return json.load(f)
 
     def delete_report(self, user_id: str, report_id: str) -> bool:
-        """Delete a specific report.
-
-        Args:
-            user_id: Identifier of the user.
-            report_id: Identifier of the report.
-
-        Returns:
-            True if deleted, False if not found.
-        """
+        """Delete a report. Returns True if found and deleted."""
         filepath = os.path.join(self.reports_dir, user_id, f"{report_id}.json")
         if os.path.exists(filepath):
             os.remove(filepath)

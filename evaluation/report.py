@@ -4,7 +4,6 @@ from datetime import datetime
 
 
 class Gap(BaseModel):
-    """A specific compliance gap identified in the evaluation."""
     area: str
     description: str
     standard_reference: str
@@ -14,7 +13,6 @@ class Gap(BaseModel):
 
 
 class ComplianceArea(BaseModel):
-    """An area where the company is compliant."""
     area: str
     description: str
     standard_reference: str
@@ -22,7 +20,6 @@ class ComplianceArea(BaseModel):
 
 
 class Recommendation(BaseModel):
-    """A specific, actionable recommendation."""
     priority: int
     title: str
     description: str
@@ -32,7 +29,6 @@ class Recommendation(BaseModel):
 
 
 class RiskItem(BaseModel):
-    """A risk identified in the assessment."""
     risk: str
     likelihood: str  # "High", "Medium", "Low"
     impact: str  # "High", "Medium", "Low"
@@ -42,7 +38,6 @@ class RiskItem(BaseModel):
 
 
 class EvaluationReport(BaseModel):
-    """Structured compliance evaluation report."""
     title: str
     generated_at: str = ""
     company_context: str = ""
