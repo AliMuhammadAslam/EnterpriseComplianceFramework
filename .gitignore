@@ -11,3 +11,4 @@ reports/
 audit_logs/
 .pytest_cache/
 thesis_documentation.md
+evaluation/results/
