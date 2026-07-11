@@ -1,6 +1,6 @@
 import os
 import chromadb
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from utils.logger import logger_instance
 from knowledge.embeddings import EmbeddingService
 from dotenv import load_dotenv
@@ -144,9 +144,13 @@ class VectorStore:
         metadatas = results["metadatas"][0] if results.get("metadatas") else [{}] * len(documents)
         distances = results["distances"][0] if results.get("distances") else [0.0] * len(documents)
         for doc, meta, dist in zip(documents, metadatas, distances):
+            # Convert cosine distance to similarity. Cosine distance ranges
+            # [0, 2], so clamp to [0, 1] to avoid displaying negative relevance
+            # for weakly-related chunks.
+            relevance = max(0.0, min(1.0, 1.0 - dist))
             formatted.append({
                 "content": doc,
                 "metadata": meta,
-                "relevance_score": 1.0 - dist,  # cosine distance to similarity
+                "relevance_score": relevance,
             })
         return formatted

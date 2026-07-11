@@ -252,17 +252,26 @@ def evaluate_compliance():
                 )
             }), 200
 
-        report = orchestrator.evaluate_compliance(
-            user_id=user_id,
-            standards=standards,
-            industry=industry,
-            country=country,
-        )
+        logs = []
+        captured_output = io.StringIO()
+        with redirect_stdout(captured_output):
+            report = orchestrator.evaluate_compliance(
+                user_id=user_id,
+                standards=standards,
+                industry=industry,
+                country=country,
+                verbose=True,
+            )
+        output_lines = captured_output.getvalue().split("\n")
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        for line in output_lines:
+            if line.strip():
+                logs.append(f"[{timestamp}] {line.strip()}")
 
         # Persist the report
         evaluated_standards = standards or [
-            "ISO 27001", "SOC 2", "GDPR", "NIST CSF",
-            "HIPAA", "PCI DSS", "COBIT",
+            "ISO 27001", "SOC 2", "GDPR", "NIST CSF", "PCI DSS",
+            "SBP Regulations", "FATF", "SECP Guidelines", "Pakistan AML/CFT",
         ]
         report_meta = report_store.save_report(
             user_id=user_id,
@@ -292,6 +301,7 @@ def evaluate_compliance():
             "standards_evaluated": evaluated_standards,
             "industry": industry,
             "country": country,
+            "logs": logs,
         })
 
     except Exception as e:
@@ -328,6 +338,29 @@ def get_report(report_id):
         report = report_store.get_report(user_id, report_id)
         if report:
             return jsonify(report)
+        return jsonify({"error": "Report not found"}), 404
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/reports/<report_id>", methods=["DELETE"])
+def delete_report(report_id):
+    """Delete a specific evaluation report."""
+    try:
+        user_id = request.args.get("user_id", "default")
+        success = report_store.delete_report(user_id, report_id)
+
+        audit.log(
+            action="REPORT_DELETE",
+            user_id=user_id,
+            resource_type="report",
+            resource_id=report_id,
+            ip_address=_get_client_ip(),
+            status="success" if success else "failure",
+        )
+
+        if success:
+            return jsonify({"message": f"Report {report_id} deleted"})
         return jsonify({"error": "Report not found"}), 404
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -397,11 +430,18 @@ def audit_summary():
 def audit_export():
     """Export audit trail as CSV."""
     try:
-        export_path = os.path.join(tempfile.gettempdir(), "audit_export.csv")
-        audit.export_csv(export_path)
-
-        with open(export_path, "r", encoding="utf-8") as f:
-            csv_content = f.read()
+        # Use a unique temp file so concurrent exports do not clobber each other.
+        with tempfile.NamedTemporaryFile(
+            mode="w", suffix=".csv", delete=False
+        ) as tmp:
+            export_path = tmp.name
+        try:
+            audit.export_csv(export_path)
+            with open(export_path, "r", encoding="utf-8") as f:
+                csv_content = f.read()
+        finally:
+            if os.path.exists(export_path):
+                os.remove(export_path)
 
         return app.response_class(
             response=csv_content,
@@ -485,7 +525,7 @@ def download_knowledge_standard(filename):
 def reset():
     """Reset the current session memory."""
     try:
-        user_id = request.get_json().get("user_id", "default") if request.is_json else "default"
+        user_id = (request.get_json(silent=True) or {}).get("user_id", "default")
         orchestrator.reset_session()
 
         audit.log(

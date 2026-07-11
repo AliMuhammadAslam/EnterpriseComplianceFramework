@@ -30,10 +30,19 @@ class Memory:
         self.memory_file = memory_file or os.getenv("MEMORY_FILE", "agent_memory.json")
         self.short_term_memory: List[MemoryEntry] = []
         self.long_term_memory: List[MemoryEntry] = []
+        # Per-user conversation history so follow-up questions stay scoped to
+        # the user who asked them and don't leak across users.
+        self.conversation_by_user: Dict[str, List[MemoryEntry]] = {}
         self._load_persistent_memory()
 
-    def add_interaction(self, query: str, response: str, metadata: Dict[str, Any] = None):
-        """Append a query-response pair to short-term memory."""
+    def add_interaction(
+        self,
+        query: str,
+        response: str,
+        user_id: str = "default",
+        metadata: Dict[str, Any] = None,
+    ):
+        """Append a query-response pair to short-term and per-user memory."""
         entry = MemoryEntry(
             id=f"interaction_{datetime.now().timestamp()}",
             content={"query": query, "response": response},
@@ -42,11 +51,15 @@ class Memory:
             metadata=metadata,
         )
         self.short_term_memory.append(entry)
+        self.conversation_by_user.setdefault(user_id, []).append(entry)
         self.logger.info(f"Added interaction to memory: {query[:50]}...")
 
-    def get_conversation_history(self, limit: int = 5) -> List[Dict[str, Any]]:
-        """Return the most recent interactions from the current session."""
-        recent = [e for e in self.short_term_memory if e.type == "interaction"][-limit:]
+    def get_conversation_history(
+        self, user_id: str = "default", limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """Return the most recent interactions for a specific user."""
+        entries = self.conversation_by_user.get(user_id, [])
+        recent = [e for e in entries if e.type == "interaction"][-limit:]
         return [e.content for e in recent]
 
     def start_new_session(self):
@@ -54,6 +67,7 @@ class Memory:
         if self.short_term_memory:
             self._save_current_session_to_long_term()
         self.short_term_memory.clear()
+        self.conversation_by_user.clear()
         self.logger.info("Started new session")
 
     def end_current_session(self):
@@ -61,6 +75,7 @@ class Memory:
         if self.short_term_memory:
             self._save_current_session_to_long_term()
             self.short_term_memory.clear()
+            self.conversation_by_user.clear()
             self.logger.info("Session ended and saved to long-term memory")
         else:
             self.logger.info("No active session to end")
@@ -91,7 +106,7 @@ class Memory:
     def _load_persistent_memory(self):
         if os.path.exists(self.memory_file):
             try:
-                with open(self.memory_file, "r") as f:
+                with open(self.memory_file, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 self.long_term_memory = [
                     MemoryEntry(**entry) for entry in data.get("long_term", [])
@@ -103,7 +118,7 @@ class Memory:
     def _save_persistent_memory(self):
         try:
             data = {"long_term": [e.model_dump() for e in self.long_term_memory]}
-            with open(self.memory_file, "w") as f:
+            with open(self.memory_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, default=str, indent=2)
             self.logger.info("Saved persistent memory")
         except Exception as e:

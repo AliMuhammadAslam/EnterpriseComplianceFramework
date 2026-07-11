@@ -1,8 +1,9 @@
 import os
 import json
 import uuid
+import shutil
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from utils.logger import logger_instance
 from knowledge.vector_store import VectorStore
 from document_upload.parser import DocumentParser
@@ -84,7 +85,6 @@ class UploadManager:
         stored_filename = f"{doc_id}_{original_filename}"
         stored_path = os.path.join(user_dir, stored_filename)
         if file_path != stored_path:
-            import shutil
             shutil.copy2(file_path, stored_path)
 
         doc_record = {
@@ -167,7 +167,7 @@ class UploadManager:
             self.upload_dir, user_id, "manifest.json"
         )
         if os.path.exists(manifest_path):
-            with open(manifest_path, "r") as f:
+            with open(manifest_path, "r", encoding="utf-8") as f:
                 return json.load(f)
         return {"user_id": user_id, "documents": []}
 
@@ -176,7 +176,7 @@ class UploadManager:
         user_dir = os.path.join(self.upload_dir, user_id)
         os.makedirs(user_dir, exist_ok=True)
         manifest_path = os.path.join(user_dir, "manifest.json")
-        with open(manifest_path, "w") as f:
+        with open(manifest_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
 
     def _update_manifest(self, user_id: str, doc_record: Dict[str, Any]):

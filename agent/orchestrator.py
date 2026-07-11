@@ -1,7 +1,6 @@
 import os
 import glob
 import hashlib
-import json
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from typing import Dict, Any, Optional
@@ -59,7 +58,7 @@ class Orchestrator:
 
             stored_hash = ""
             if os.path.exists(hash_file):
-                with open(hash_file, "r") as f:
+                with open(hash_file, "r", encoding="utf-8") as f:
                     stored_hash = f.read().strip()
 
             needs_ingest = (
@@ -70,7 +69,7 @@ class Orchestrator:
             if needs_ingest:
                 self.logger.info("Ingesting regulatory knowledge base (new or updated files)...")
                 self.knowledge_base.ingest(force=True)
-                with open(hash_file, "w") as f:
+                with open(hash_file, "w", encoding="utf-8") as f:
                     f.write(current_hash)
                 self.logger.info("Knowledge base ingestion complete")
             else:
@@ -116,11 +115,22 @@ class Orchestrator:
             if verbose:
                 print(f"[RAG] Retrieved {len(rag_context)} chars of context")
 
+            # prior conversation (scoped to this user) for follow-up questions
+            conversation_context = self._format_conversation_history(
+                self.memory.get_conversation_history(user_id=user_id, limit=3)
+            )
+            if verbose and conversation_context:
+                print("[MEMORY] Injecting prior conversation turns for context")
+
             # plan and execute
             if verbose:
                 print("[PLANNER] Creating plan...")
 
-            plan = self.planner.create_plan(perception_output, rag_context=rag_context)
+            plan = self.planner.create_plan(
+                perception_output,
+                rag_context=rag_context,
+                conversation_context=conversation_context,
+            )
 
             if verbose:
                 print(f"[PLANNER] {len(plan.steps)} steps:")
@@ -128,10 +138,17 @@ class Orchestrator:
                     print(f"           {step.step_number}. {step.description}")
                 print("[EXECUTOR] Executing plan...")
 
-            execution_result = self.executor.execute_plan(plan, verbose, rag_context=rag_context)
+            execution_result = self.executor.execute_plan(
+                plan,
+                verbose,
+                rag_context=rag_context,
+                conversation_context=conversation_context,
+            )
 
-            # store interaction
-            self.memory.add_interaction(user_input, execution_result.result)
+            # store interaction (scoped to this user)
+            self.memory.add_interaction(
+                user_input, execution_result.result, user_id=user_id
+            )
 
             if verbose:
                 print("[ORCHESTRATOR] Done")
@@ -154,12 +171,29 @@ class Orchestrator:
                 error=str(e),
             )
 
+    def _format_conversation_history(self, history: list) -> str:
+        """Format recent user/agent turns into a compact context block."""
+        if not history:
+            return ""
+        lines = []
+        for turn in history:
+            query = (turn.get("query") or "").strip()
+            response = (turn.get("response") or "").strip()
+            if not query:
+                continue
+            # keep responses bounded so history doesn't dominate the prompt
+            if len(response) > 600:
+                response = response[:600] + "..."
+            lines.append(f"User: {query}\nAssistant: {response}")
+        return "\n\n".join(lines)
+
     def evaluate_compliance(
         self,
         user_id: str,
         standards: list = None,
         industry: str = "",
         country: str = "",
+        verbose: bool = False,
     ) -> str:
         """Delegate to the evaluation engine for a user's compliance report."""
         return self.evaluation_engine.evaluate_compliance(
@@ -167,6 +201,7 @@ class Orchestrator:
             standards=standards,
             industry=industry,
             country=country,
+            verbose=verbose,
         )
 
     def get_system_status(self) -> Dict[str, Any]:

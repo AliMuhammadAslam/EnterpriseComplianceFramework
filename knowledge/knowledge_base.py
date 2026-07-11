@@ -18,6 +18,10 @@ class KnowledgeBase:
         )
         self.chunk_size = int(os.getenv("CHUNK_SIZE", "500"))
         self.chunk_overlap = int(os.getenv("CHUNK_OVERLAP", "50"))
+        # Guard against a misconfigured overlap >= size, which would stop the
+        # split loop from advancing and hang during ingestion.
+        if self.chunk_overlap >= self.chunk_size:
+            self.chunk_overlap = self.chunk_size - 1
         self.logger = logger_instance.get_logger("knowledge_base")
         self.logger.info(
             f"KnowledgeBase initialized, path: {self.knowledge_path}"

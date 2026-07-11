@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ComplianceAI — Enterprise Compliance Framework</title>
+    <title>ComplianceAI - Enterprise Compliance Framework</title>
     <meta name="description" content="AI-powered compliance evaluation platform for fintech organizations. Evaluate security posture against ISO 27001, SOC 2, GDPR, NIST, PCI DSS, and more.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -797,7 +797,7 @@
         .chat-input-wrapper {
             display: flex;
             gap: 0.5rem;
-            align-items: center;
+            align-items: flex-end;
             background: var(--bg-surface-alt);
             border: 1px solid var(--border);
             border-radius: var(--radius-md);
@@ -807,7 +807,7 @@
 
         .chat-input-wrapper:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 
-        .chat-input-wrapper input {
+        .chat-input-wrapper textarea {
             flex: 1;
             border: none;
             background: transparent;
@@ -815,10 +815,15 @@
             font-family: inherit;
             font-size: 0.9rem;
             color: var(--text-primary);
+            resize: none;
+            line-height: 1.4;
+            max-height: 8.5rem;
+            overflow-y: auto;
         }
 
-        .chat-input-wrapper input:focus { outline: none; }
-        .chat-input-wrapper input::placeholder { color: var(--text-muted); }
+        .chat-input-wrapper textarea:focus { outline: none; }
+        .chat-input-wrapper textarea::placeholder { color: var(--text-muted); }
+        .chat-input-wrapper textarea:disabled { opacity: 0.6; cursor: not-allowed; }
 
         .send-btn {
             width: 38px; height: 38px;
@@ -885,7 +890,7 @@
         }
 
         .logs-bar.collapsed { height: 36px; }
-        .logs-bar.expanded { height: 180px; }
+        .logs-bar.expanded { height: 70vh; }
 
         .logs-header {
             display: flex;
@@ -914,7 +919,8 @@
             overflow-y: auto;
             height: calc(100% - 36px);
             font-family: 'Fira Code', 'Consolas', monospace;
-            font-size: 0.72rem;
+            font-size: 0.95rem;
+            line-height: 1.5;
             color: rgba(255,255,255,0.6);
         }
 
@@ -1123,6 +1129,14 @@
         .modal-report-content th, .modal-report-content td { border: 1px solid var(--border); padding: 0.4rem 0.6rem; text-align: left; }
         .modal-report-content th { background: var(--bg-surface-alt); font-weight: 600; }
 
+        /* Risk-level colour badges (UI #7) */
+        .risk-badge { display:inline-block; padding:0.05rem 0.5rem; border-radius:10px; font-size:0.8rem; font-weight:600; line-height:1.4; white-space:nowrap; }
+        .risk-critical { background:#fdecea; color:#b71c1c; border:1px solid #f5c6cb; }
+        .risk-high     { background:#fff1e6; color:#c0531c; border:1px solid #ffd1b3; }
+        .risk-medium   { background:#fff8e1; color:#8a6d00; border:1px solid #ffe7a3; }
+        .risk-low      { background:#e9f7ef; color:#1e7e44; border:1px solid #bfe6cd; }
+        .prio-badge    { display:inline-block; padding:0.05rem 0.5rem; border-radius:10px; font-size:0.8rem; font-weight:600; background:var(--bg-surface-alt); color:var(--text); border:1px solid var(--border); white-space:nowrap; }
+
         /* Standards tooltip in report history */
         .std-tooltip-wrapper {
             position: relative;
@@ -1146,6 +1160,30 @@
         }
 
         .std-tooltip-wrapper:hover .std-tooltip { display: block; }
+
+        /* Consistent keyboard focus rings (accessibility + polish) */
+        a:focus-visible,
+        button:focus-visible,
+        textarea:focus-visible,
+        input:focus-visible,
+        [tabindex]:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+            border-radius: var(--radius-sm);
+        }
+        /* Mouse clicks shouldn't show the ring; only keyboard navigation */
+        a:focus:not(:focus-visible),
+        button:focus:not(:focus-visible) { outline: none; }
+
+        /* Respect users who prefer reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after {
+                animation-duration: 0.001ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.001ms !important;
+                scroll-behavior: auto !important;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1332,7 +1370,7 @@
 
                 <div class="chat-input-container">
                     <div class="chat-input-wrapper">
-                        <input type="text" id="messageInput" placeholder="Ask about compliance standards, regulations, or your documents..." onkeypress="handleKeyPress(event)">
+                        <textarea id="messageInput" rows="1" placeholder="Ask about compliance standards, regulations, or your documents..." onkeydown="handleKeyPress(event)" oninput="autoGrowInput(this)"></textarea>
                         <button class="send-btn" onclick="sendMessage()" id="sendButton" title="Send message">➤</button>
                     </div>
                 </div>
@@ -1388,6 +1426,7 @@
         // State
         // ------------------------------------------------------------------
         let USER_ID = 'default';
+        let _chatInFlight = false;  // guards against duplicate concurrent sends
 
         // Default-checked standards for fintech / Pakistan context
         const DEFAULT_CHECKED_STANDARDS = [
@@ -1535,6 +1574,7 @@
             // Clear per-user UI state and show personalised welcome
             document.getElementById('chatMessages').innerHTML = '';
             document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
+            showWelcomeMessage(meta.name || value);
 
             // Reset standards checkboxes to defaults
             document.querySelectorAll('#standardsGrid input[type="checkbox"]').forEach(cb => {
@@ -1657,7 +1697,7 @@
                 if (data.success) {
                     progress.className = 'upload-progress show success';
                     progress.textContent = `✓ ${file.name}: ${data.chunks} chunks indexed`;
-                    showToast(`Document "${file.name}" uploaded — ${data.chunks} chunks indexed`, 'success');
+                    showToast(`Document "${file.name}" uploaded - ${data.chunks} chunks indexed`, 'success');
                     loadDocuments();
                     loadAuditLogs();
                 } else {
@@ -1701,8 +1741,11 @@
 
             const standards = getSelectedStandards();
 
-            addMessage('user', `Run compliance evaluation against ${standards.length} standard(s) — Fintech / Pakistan`);
+            addMessage('user', `Run compliance evaluation against ${standards.length} standard(s) - Fintech / Pakistan`);
             showTyping(true);
+
+            const logsContent = document.getElementById('logsContent');
+            logsContent.innerHTML = '<div class="log-entry">Running evaluation...</div>';
 
             try {
                 const res = await fetch('/evaluate', {
@@ -1737,8 +1780,9 @@
                     showToast(data.error, 'error');
                 } else {
                     addMessage('agent', data.report);
-                    showToast(`Evaluation complete — Report ID: ${data.report_id}`, 'success');
+                    showToast(`Evaluation complete - Report ID: ${data.report_id}`, 'success');
                     loadReports();
+                    if (data.logs) displayLogs(data.logs);
                 }
                 loadAuditLogs();
             } catch (e) {
@@ -1781,7 +1825,9 @@
                             ${r.standards.length} stds
                         </span>
                         <button class="delete-btn" onclick="event.stopPropagation(); downloadReport('${r.report_id}')"
-                            title="Download report as Markdown" style="color:var(--accent); font-size:1rem;">📥</button>`;
+                            title="Download report as Markdown" style="color:var(--accent); font-size:1rem;">📥</button>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteReport('${r.report_id}')"
+                            title="Delete report" style="font-size:1rem;">🗑️</button>`;
                     div.addEventListener('click', () => viewReport(r.report_id, r));
                     list.appendChild(div);
                 });
@@ -1834,6 +1880,32 @@
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
+        }
+
+        function deleteReport(reportId) {
+            showConfirmModal(
+                'Delete Report',
+                'Delete this evaluation report? This cannot be undone.',
+                'Delete',
+                async () => {
+                    try {
+                        const res = await fetch(`/reports/${reportId}?user_id=${USER_ID}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (res.ok) {
+                            // If the deleted report is open in the modal, close it
+                            if (_currentModalReportId === reportId) closeReportModal();
+                            loadReports();
+                            loadAuditLogs();
+                            showToast('Report deleted', 'info');
+                        } else {
+                            showToast(data.error || 'Failed to delete report', 'error');
+                        }
+                    } catch (e) {
+                        console.error('Error deleting report:', e);
+                        showToast('Failed to delete report', 'error');
+                    }
+                }
+            );
         }
 
         // ------------------------------------------------------------------
@@ -1894,16 +1966,27 @@
             }
         }
 
+        function autoGrowInput(el) {
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 136) + 'px';  // cap matches CSS max-height
+        }
+
         async function sendMessage() {
+            // Guard against duplicate concurrent requests (e.g. spamming Enter)
+            if (_chatInFlight) return;
+
             const input = document.getElementById('messageInput');
             const message = input.value.trim();
             if (!message) return;
 
+            _chatInFlight = true;
             addMessage('user', message);
             input.value = '';
+            autoGrowInput(input);
 
             const sendBtn = document.getElementById('sendButton');
             sendBtn.disabled = true;
+            input.disabled = true;
             showTyping(true);
 
             const logsContent = document.getElementById('logsContent');
@@ -1930,9 +2013,12 @@
             } catch (error) {
                 showTyping(false);
                 addMessage('agent', `**Error:** ${error.message}`);
+            } finally {
+                _chatInFlight = false;
+                sendBtn.disabled = false;
+                input.disabled = false;
+                input.focus();
             }
-
-            sendBtn.disabled = false;
         }
 
         // ------------------------------------------------------------------
@@ -1962,7 +2048,7 @@
             let html = escapeHtml(text);
 
             // No-docs warning callout
-            html = html.replace(/^⚠ IMPORTANT — (.+)$/gm, (_, msg) =>
+            html = html.replace(/^⚠ IMPORTANT - (.+)$/gm, (_, msg) =>
                 `<div class="no-docs-warning">⚠ <strong>No company documents uploaded.</strong> ${msg}</div>`
             );
 
@@ -2013,6 +2099,18 @@
                 }).join('');
                 return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
             });
+
+            // Risk-level colour badges (UI #7) — runs after tables so cells are covered
+            const riskClass = lvl => 'risk-' + lvl.trim().toLowerCase();
+            // Risk level shown as a standalone table cell
+            html = html.replace(/<td>(Critical|High|Medium|Low)<\/td>/g,
+                (_, lvl) => `<td><span class="risk-badge ${riskClass(lvl)}">${lvl}</span></td>`);
+            // Priority band shown as a standalone table cell
+            html = html.replace(/<td>(Immediate[^<]*|Short-term|Medium-term|Long-term)<\/td>/g,
+                (_, band) => `<td><span class="prio-badge">${band}</span></td>`);
+            // Inline "Risk Level: <level>" outside tables (plain or with trailing bold tag)
+            html = html.replace(/(Risk Level:?(?:<\/strong>)?:?\s*)(Critical|High|Medium|Low)\b/g,
+                (_, pre, lvl) => `${pre}<span class="risk-badge ${riskClass(lvl)}">${lvl}</span>`);
 
             // Paragraphs — only split on double newlines that aren't already inside block elements
             html = html.replace(/\n\n+/g, '</p><p>');
