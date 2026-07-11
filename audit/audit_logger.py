@@ -21,21 +21,6 @@ class AuditEntry(BaseModel):
     status: str = "success"
 
 
-# Supported audit action types
-AUDIT_ACTIONS = {
-    "CHAT_QUERY": "User sent a chat query",
-    "DOCUMENT_UPLOAD": "Document uploaded to the system",
-    "DOCUMENT_DELETE": "Document deleted from the system",
-    "EVALUATION_RUN": "Compliance evaluation executed",
-    "SESSION_RESET": "User session reset",
-    "SESSION_END": "User session ended",
-    "KNOWLEDGE_INGEST": "Knowledge base ingested or re-ingested",
-    "SYSTEM_START": "Application started",
-    "REPORT_DOWNLOAD": "Evaluation report downloaded",
-    "KNOWLEDGE_QUERY": "Knowledge base queried",
-}
-
-
 class AuditLogger:
     """Persistent audit logger using JSON Lines format.
 

@@ -89,7 +89,8 @@ class Perception:
 
         compliance_keywords = [
             "compliance", "audit", "evaluate", "assessment", "gap analysis",
-            "iso 27001", "soc 2", "gdpr", "hipaa", "pci dss", "nist", "cobit",
+            "iso 27001", "soc 2", "gdpr", "pci dss", "nist",
+            "sbp", "secp", "aml", "cft", "fatf", "peca",
             "security posture", "governance", "regulation", "standard",
         ]
         if any(kw in content_lower for kw in compliance_keywords):

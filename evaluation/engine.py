@@ -1,6 +1,5 @@
 import os
-import json
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 from litellm import completion
 from utils.logger import logger_instance
@@ -18,7 +17,7 @@ class EvaluationEngine:
         self.logger = logger_instance.get_logger("evaluation_engine")
         self.model_config = {
             "model": f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}",
-            "temperature": 0.2,
+            "temperature": 0,
             "max_tokens": int(os.getenv("MAX_TOKENS", "4000")),
         }
         self.logger.info("EvaluationEngine initialized")
@@ -30,17 +29,23 @@ class EvaluationEngine:
         industry: str = "",
         country: str = "",
         specific_query: str = "",
+        verbose: bool = False,
     ) -> str:
         """Evaluate a user's documents against the given standards and return a markdown report."""
         self.logger.info(
             f"Starting compliance evaluation for user: {user_id}"
         )
+        if verbose:
+            print(f"[EVALUATION] Starting compliance evaluation for user: {user_id}")
 
         if not standards:
             standards = [
-                "ISO 27001", "SOC 2", "GDPR", "NIST CSF",
-                "HIPAA", "PCI DSS", "COBIT"
+                "ISO 27001", "SOC 2", "GDPR", "NIST CSF", "PCI DSS",
+                "SBP Regulations", "FATF", "SECP Guidelines", "Pakistan AML/CFT",
             ]
+
+        if verbose:
+            print(f"[EVALUATION] Standards selected ({len(standards)}): {', '.join(standards)}")
 
         company_query = (
             "security policies, compliance, governance, controls, "
@@ -50,15 +55,25 @@ class EvaluationEngine:
         if specific_query:
             company_query = specific_query
 
+        if verbose:
+            print("[EVALUATION] Retrieving company documents from vector store...")
         company_context = self.rag_pipeline.retrieve_company_docs_only(
             user_id, company_query
         )
+        if verbose:
+            print(f"[EVALUATION] Retrieved {len(company_context)} chars of company document context")
 
         # one query per standard avoids crowding in combined similarity search
+        if verbose:
+            print("[EVALUATION] Retrieving regulatory context per standard (anti-crowding)...")
         regulatory_context = self._retrieve_per_standard_context(
-            standards, industry, country
+            standards, industry, country, verbose=verbose
         )
+        if verbose:
+            print(f"[EVALUATION] Retrieved {len(regulatory_context)} chars of regulatory context total")
 
+        if verbose:
+            print(f"[EVALUATION] Generating structured report via {self.model_config['model']} (temperature={self.model_config['temperature']})...")
         report_text = self._generate_evaluation(
             company_context=company_context,
             regulatory_context=regulatory_context,
@@ -67,8 +82,12 @@ class EvaluationEngine:
             country=country,
             specific_query=specific_query,
         )
+        if verbose:
+            print(f"[EVALUATION] Report generated ({len(report_text)} chars)")
 
         self.logger.info("Compliance evaluation completed")
+        if verbose:
+            print("[EVALUATION] Done")
         return report_text
 
     def _retrieve_per_standard_context(
@@ -76,6 +95,7 @@ class EvaluationEngine:
         standards: List[str],
         industry: str,
         country: str,
+        verbose: bool = False,
     ) -> str:
         """Query the knowledge base once per standard to avoid similarity crowding."""
         sections = []
@@ -86,6 +106,8 @@ class EvaluationEngine:
             if country:
                 query += f" {country}"
             chunk = self.rag_pipeline.retrieve_knowledge_only(query)
+            if verbose:
+                print(f"[EVALUATION]   -> {std}: retrieved {len(chunk)} chars")
             sections.append(f"=== {std} ===\n{chunk}")
         return "\n\n".join(sections)
 
@@ -126,9 +148,26 @@ Specific gaps or deficiencies found. For each gap:
 Overall risk assessment based on identified gaps:
 - Risk description
 - Likelihood (High / Medium / Low)
-- Impact (High / Medium / Low) 
+- Impact (High / Medium / Low)
 - Overall Risk Level
 - Suggested mitigation
+
+## Regulatory Risk Score and Prioritization
+Compute a transparent Regulatory Risk Score for EVERY gap identified in the Gap Analysis using this fixed formula:
+
+  Regulatory Risk Score = Obligation Severity (S) x Likelihood of Enforcement (L) x Adequacy Gap (G)
+
+Where:
+- Obligation Severity (S), scale 1 to 5: AML/CFT, sanctions, financial crime and customer data protection obligations = 5; core security controls such as access control, encryption and incident response = 4; governance and operational resilience = 3; reporting and record keeping = 2; purely administrative or procedural items = 1.
+- Likelihood of Enforcement (L), scale 1 to 3: active regulator focus such as SBP AML/CFT = 3; Medium = 2; Low = 1.
+- Adequacy Gap (G), scale 1 to 3: control or documentation entirely absent = 3; partially present = 2; minor gap = 1.
+
+The score ranges from 1 to 45. Derive a priority band from the score:
+- Score 24 or above: Immediate (Short-term action)
+- Score 10 to 23: Medium-term action
+- Score 9 or below: Long-term action
+
+Present this as a Markdown table with the columns: Gap | Standard | S | L | G | Risk Score | Priority Band, sorted by Risk Score from highest to lowest. Always show the actual S, L and G values you used so the calculation is fully traceable and reproducible.
 
 ## Recommendations
 Specific, actionable recommendations ordered by priority. For each:
@@ -140,11 +179,12 @@ Specific, actionable recommendations ordered by priority. For each:
 
 CRITICAL RULES:
 - You MUST include a section for EVERY standard listed in "Standards to evaluate against". Do not skip any standard, even if the retrieved context is limited — in that case note the gap explicitly.
-- ALWAYS cite the specific standard clause, article, section, or requirement number for EVERY finding (e.g. "ISO 27001 Clause 6.1.2", "SBP Information Security Circular 2017 Section 3.2", "GDPR Article 32").
+- ALWAYS cite the specific clause, article, section, control ID, or requirement identifier for EVERY finding, but ONLY at the level of granularity that actually appears in the provided regulatory context below. Do not invent a more specific sub-clause, sub-section, or sub-control number than what is explicitly written in the retrieved context, even if you recall a more granular numbering scheme from general knowledge. If the retrieved context only names a top-level clause or theme, cite it at that level rather than guessing a finer subdivision.
 - Be specific and actionable in recommendations.
 - Base your analysis ONLY on the provided company documents and regulatory context.
 - If company documents are absent or insufficient for a standard, explicitly state "No company documentation found for this area" and recommend what should be produced.
-- Assign risk levels (Critical / High / Medium / Low) based on potential regulatory impact and likelihood of enforcement."""
+- Assign risk levels (Critical / High / Medium / Low) based on potential regulatory impact and likelihood of enforcement.
+- Apply the Regulatory Risk Score formula exactly as defined. For every gap, show the S, L and G component values you used so the score is reproducible and never a subjective guess, then order the Recommendations to follow the resulting priority bands."""
 
         standards_list = "\n".join(f"  {i+1}. {s}" for i, s in enumerate(standards))
         user_prompt = f"""Evaluate the following company's compliance posture.
@@ -162,7 +202,7 @@ CRITICAL RULES:
 --- REGULATORY KNOWLEDGE BASE (organised per standard) ---
 {regulatory_context}
 
-Produce a detailed, structured compliance evaluation report. You MUST explicitly address every standard listed above — include its name as a sub-heading under each section where relevant. Cite specific clause/article/section numbers for every finding."""
+Produce a detailed, structured compliance evaluation report. You MUST explicitly address every standard listed above — include its name as a sub-heading under each section where relevant. Cite specific clause/article/section numbers for every finding. In the Regulatory Risk Score and Prioritization section, include the scoring table with the S, L and G values shown for every gap."""
 
         try:
             response = completion(

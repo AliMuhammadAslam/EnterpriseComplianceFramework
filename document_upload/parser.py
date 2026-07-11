@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from utils.logger import logger_instance
 
 

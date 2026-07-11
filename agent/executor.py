@@ -27,7 +27,11 @@ class Executor:
         }
 
     def execute_plan(
-        self, plan, verbose: bool = False, rag_context: str = ""
+        self,
+        plan,
+        verbose: bool = False,
+        rag_context: str = "",
+        conversation_context: str = "",
     ) -> ExecutionResult:
         """Execute plan steps sequentially and return a compiled result."""
         self.logger.info(f"Executing plan with {len(plan.steps)} steps")
@@ -48,7 +52,9 @@ class Executor:
                 overall_success = False
                 continue
 
-            result_text = self._execute_with_llm(step, step_results, rag_context)
+            result_text = self._execute_with_llm(
+                step, step_results, rag_context, conversation_context
+            )
             step_results.append({"step_number": step.step_number, "success": True, "result": result_text})
 
             if verbose:
@@ -56,7 +62,9 @@ class Executor:
 
             self.logger.info(f"Step {step.step_number} completed successfully")
 
-        final_result = self._compile_final_result(step_results, plan.goal, rag_context)
+        final_result = self._compile_final_result(
+            step_results, plan.goal, rag_context, conversation_context
+        )
 
         if verbose:
             print("[EXECUTOR] Final result compiled")
@@ -68,7 +76,11 @@ class Executor:
         )
 
     def _execute_with_llm(
-        self, step, previous_results: List[Dict], rag_context: str = ""
+        self,
+        step,
+        previous_results: List[Dict],
+        rag_context: str = "",
+        conversation_context: str = "",
     ) -> str:
         """Send a single plan step to the LLM with accumulated context."""
         prior_context = ""
@@ -77,6 +89,13 @@ class Executor:
             for r in previous_results[-3:]:
                 if r.get("success"):
                     prior_context += f"Step {r['step_number']}: {r['result']}\n"
+
+        history_section = ""
+        if conversation_context:
+            history_section = (
+                f"\nRECENT CONVERSATION (for resolving follow-up references):\n"
+                f"{conversation_context}\n"
+            )
 
         rag_section = ""
         if rag_context:
@@ -90,7 +109,7 @@ Cite specific standards, clauses, or articles where applicable.
         system_message = f"""You are an AI assistant specialising in compliance, security, and governance.
 
 Use the provided reference material to give accurate, well-cited responses.
-{rag_section}
+{history_section}{rag_section}
 Provide clear, specific, and actionable results. Citation rules:
 - Use ONLY the control numbers, clause numbers, article numbers, and section identifiers that appear in the provided reference material above. Do not rely on your training knowledge for specific identifiers — standards are versioned and numbering changes between versions.
 - Every requirement or control you mention must include its identifier exactly as it appears in the reference material (e.g. the clause number, article number, control ID, or section reference).
@@ -118,7 +137,11 @@ Provide clear, specific, and actionable results. Citation rules:
         return all(dep in completed for dep in step.dependencies)
 
     def _compile_final_result(
-        self, step_results: List[Dict], goal: str, rag_context: str = ""
+        self,
+        step_results: List[Dict],
+        goal: str,
+        rag_context: str = "",
+        conversation_context: str = "",
     ) -> str:
         """Combine all step outputs into a single final answer."""
         successful = [r for r in step_results if r.get("success") and r.get("result")]
@@ -129,9 +152,14 @@ Provide clear, specific, and actionable results. Citation rules:
         all_data = "\n".join(str(r["result"]) for r in successful)
 
         rag_section = f"\nREFERENCE MATERIAL:\n{rag_context}\n" if rag_context else ""
+        history_section = (
+            f"\nRECENT CONVERSATION (for resolving follow-up references):\n"
+            f"{conversation_context}\n"
+            if conversation_context else ""
+        )
 
         system_message = f"""You are a compliance and governance specialist summarising analysis results.
-{rag_section}
+{history_section}{rag_section}
 Write a clear, comprehensive answer that directly addresses what the user asked.
 - Structure your response with clear sections where appropriate
 - Do not mention internal processing steps
