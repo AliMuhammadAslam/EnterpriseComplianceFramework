@@ -46,12 +46,19 @@ class Planner:
             "max_tokens": int(os.getenv("MAX_TOKENS", "4000")),
         }
 
-    def create_plan(self, perception_output, rag_context: str = "") -> Plan:
+    def create_plan(
+        self,
+        perception_output,
+        rag_context: str = "",
+        conversation_context: str = "",
+    ) -> Plan:
         """Generate a JSON step plan enriched with RAG context.
 
         Args:
             perception_output: Classified input from the Perception stage.
             rag_context: Retrieved regulatory and company document context.
+            conversation_context: Recent user/agent turns, so the plan can
+                resolve follow-up references (e.g. "the second gap").
 
         Returns:
             A Plan with one or more PlanSteps for the Executor to run.
@@ -60,6 +67,15 @@ class Planner:
         intent = perception_output.intent
 
         self.logger.info(f"Creating plan for goal: {goal[:80]}...")
+
+        history_section = ""
+        if conversation_context and conversation_context.strip():
+            history_section = f"""
+RECENT CONVERSATION (most recent last):
+Use this to interpret follow-up questions that refer back to earlier turns.
+
+{conversation_context}
+"""
 
         rag_section = ""
         if rag_context and rag_context.strip():
@@ -79,7 +95,7 @@ For compliance queries, the plan should include steps to:
         system_message = f"""You are a compliance-aware planning agent. Create a step-by-step plan to achieve the given goal.
 
 No tools are available — set tool_required to null for ALL steps.
-
+{history_section}
 {rag_section}
 
 Respond with a JSON plan in this exact format:

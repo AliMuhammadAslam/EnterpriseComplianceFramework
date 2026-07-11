@@ -11,6 +11,10 @@ class DocumentChunker:
         self.chunk_overlap = chunk_overlap or int(
             os.getenv("CHUNK_OVERLAP", "50")
         )
+        # Guard against a misconfigured overlap >= size, which would stop the
+        # split loop from advancing and hang on the first document.
+        if self.chunk_overlap >= self.chunk_size:
+            self.chunk_overlap = self.chunk_size - 1
         self.logger = logger_instance.get_logger("document_chunker")
 
     def chunk_text(
