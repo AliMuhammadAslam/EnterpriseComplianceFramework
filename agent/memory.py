@@ -62,12 +62,20 @@ class Memory:
         recent = [e for e in entries if e.type == "interaction"][-limit:]
         return [e.content for e in recent]
 
+    def clear_user_conversation(self, user_id: str = "default"):
+        """Clear only this user's follow-up conversation history.
+
+        Scoped to one user so resetting one person's session doesn't wipe
+        everyone else's conversation context.
+        """
+        self.conversation_by_user.pop(user_id, None)
+        self.logger.info(f"Cleared conversation history for user: {user_id}")
+
     def start_new_session(self):
         """Persist the current session and start fresh."""
         if self.short_term_memory:
             self._save_current_session_to_long_term()
         self.short_term_memory.clear()
-        self.conversation_by_user.clear()
         self.logger.info("Started new session")
 
     def end_current_session(self):
@@ -75,7 +83,6 @@ class Memory:
         if self.short_term_memory:
             self._save_current_session_to_long_term()
             self.short_term_memory.clear()
-            self.conversation_by_user.clear()
             self.logger.info("Session ended and saved to long-term memory")
         else:
             self.logger.info("No active session to end")

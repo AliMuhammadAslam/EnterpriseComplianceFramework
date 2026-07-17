@@ -29,6 +29,7 @@ class EvaluationEngine:
         industry: str = "",
         country: str = "",
         specific_query: str = "",
+        doc_ids: List[str] = None,
         verbose: bool = False,
     ) -> str:
         """Evaluate a user's documents against the given standards and return a markdown report."""
@@ -56,9 +57,12 @@ class EvaluationEngine:
             company_query = specific_query
 
         if verbose:
-            print("[EVALUATION] Retrieving company documents from vector store...")
+            if doc_ids:
+                print(f"[EVALUATION] Retrieving company documents (restricted to {len(doc_ids)} selected document(s))...")
+            else:
+                print("[EVALUATION] Retrieving company documents from vector store (all uploaded documents)...")
         company_context = self.rag_pipeline.retrieve_company_docs_only(
-            user_id, company_query
+            user_id, company_query, doc_ids=doc_ids
         )
         if verbose:
             print(f"[EVALUATION] Retrieved {len(company_context)} chars of company document context")
@@ -129,11 +133,18 @@ You must produce a STRUCTURED evaluation report with the following sections:
 ## Executive Summary
 A high-level overview of the company's compliance posture.
 
+## Standards Coverage
+Provide a status line for EACH standard listed under Standards to evaluate against, using its exact name. Classify every standard as exactly one of:
+- Findings: the company documents contain evidence relevant to this standard, detailed in the sections below.
+- Documentation gap: this standard is relevant to the company but the documents provide no evidence for it, so compliance cannot be demonstrated.
+- Not applicable: this standard does not apply to an entity of this type; briefly say why.
+Present this as a Markdown table with the columns: Standard | Status | Note. Every listed standard must appear here exactly once, so that no standard is silently dropped.
+
 ## Compliant Areas
 Areas where the company meets or exceeds the standards. For each:
 - Area name
 - Description of compliance
-- Specific standard reference (e.g., "ISO 27001 Clause 5.2", "GDPR Article 25")
+- Specific standard reference (the exact clause, article, or control identifier as it appears in the regulatory context provided below, not a number you recall from general knowledge)
 
 ## Gap Analysis
 Specific gaps or deficiencies found. For each gap:
@@ -178,11 +189,11 @@ Specific, actionable recommendations ordered by priority. For each:
 - Expected effort (Quick Win / Short-term / Medium-term / Long-term)
 
 CRITICAL RULES:
-- You MUST include a section for EVERY standard listed in "Standards to evaluate against". Do not skip any standard, even if the retrieved context is limited — in that case note the gap explicitly.
+- Every standard listed under Standards to evaluate against MUST appear exactly once in the Standards Coverage section, marked as Findings, Documentation gap, or Not applicable. Never silently omit a listed standard. In the detailed sections such as Compliant Areas and Gap Analysis, only include a standard where it genuinely has compliant areas or gaps. Do not pad the report with empty subsections for standards that are Not applicable.
 - ALWAYS cite the specific clause, article, section, control ID, or requirement identifier for EVERY finding, but ONLY at the level of granularity that actually appears in the provided regulatory context below. Do not invent a more specific sub-clause, sub-section, or sub-control number than what is explicitly written in the retrieved context, even if you recall a more granular numbering scheme from general knowledge. If the retrieved context only names a top-level clause or theme, cite it at that level rather than guessing a finer subdivision.
 - Be specific and actionable in recommendations.
 - Base your analysis ONLY on the provided company documents and regulatory context.
-- If company documents are absent or insufficient for a standard, explicitly state "No company documentation found for this area" and recommend what should be produced.
+- If a relevant standard has no supporting company documentation, record it as a Documentation gap in the Standards Coverage section and recommend what the company should produce. If a standard genuinely does not apply to this entity, record it as Not applicable instead of reporting a documentation gap.
 - Assign risk levels (Critical / High / Medium / Low) based on potential regulatory impact and likelihood of enforcement.
 - Apply the Regulatory Risk Score formula exactly as defined. For every gap, show the S, L and G component values you used so the score is reproducible and never a subjective guess, then order the Recommendations to follow the resulting priority bands."""
 
@@ -202,7 +213,7 @@ CRITICAL RULES:
 --- REGULATORY KNOWLEDGE BASE (organised per standard) ---
 {regulatory_context}
 
-Produce a detailed, structured compliance evaluation report. You MUST explicitly address every standard listed above — include its name as a sub-heading under each section where relevant. Cite specific clause/article/section numbers for every finding. In the Regulatory Risk Score and Prioritization section, include the scoring table with the S, L and G values shown for every gap."""
+Produce a detailed, structured compliance evaluation report. In the Standards Coverage section, list every one of the standards above exactly once with its status of Findings, Documentation gap, or Not applicable, so that no standard is silently omitted. Do not create empty Compliant Areas or Gap Analysis subsections for standards that are Not applicable. Cite specific clause/article/section numbers for every finding. In the Regulatory Risk Score and Prioritization section, include the scoring table with the S, L and G values shown for every gap."""
 
         try:
             response = completion(

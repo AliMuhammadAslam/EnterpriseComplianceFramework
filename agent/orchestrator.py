@@ -193,6 +193,7 @@ class Orchestrator:
         standards: list = None,
         industry: str = "",
         country: str = "",
+        doc_ids: list = None,
         verbose: bool = False,
     ) -> str:
         """Delegate to the evaluation engine for a user's compliance report."""
@@ -201,6 +202,7 @@ class Orchestrator:
             standards=standards,
             industry=industry,
             country=country,
+            doc_ids=doc_ids,
             verbose=verbose,
         )
 
@@ -226,8 +228,9 @@ class Orchestrator:
             },
         }
 
-    def reset_session(self):
-        """Clear memory and start a fresh session."""
+    def reset_session(self, user_id: str = "default"):
+        """Clear a user's conversation memory and start a fresh session."""
         self.memory.end_current_session()
         self.memory.start_new_session()
-        self.logger.info("Session reset")
+        self.memory.clear_user_conversation(user_id)
+        self.logger.info(f"Session reset for user: {user_id}")

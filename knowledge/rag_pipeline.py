@@ -43,11 +43,16 @@ class RAGPipeline:
         return self._format_section("Regulatory Knowledge Base", results)
 
     def retrieve_company_docs_only(
-        self, user_id: str, query: str
+        self, user_id: str, query: str, doc_ids: Optional[List[str]] = None
     ) -> str:
-        """Retrieve context only from user's company documents."""
+        """Retrieve context only from user's company documents.
+
+        doc_ids restricts retrieval to specific uploaded documents, so an
+        evaluation can target one company's files without blending in
+        others uploaded under the same user.
+        """
         results = self.vector_store.query_company_documents(
-            user_id, query, top_k=self.top_k
+            user_id, query, top_k=self.top_k, doc_ids=doc_ids
         )
         return self._format_section("Company Documents", results)
 
