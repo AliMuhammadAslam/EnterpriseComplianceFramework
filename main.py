@@ -40,7 +40,7 @@ class AgentCLI:
                     continue
                     
                 if user_input.lower() == 'reset':
-                    self.orchestrator.reset_session()
+                    self.orchestrator.reset_session(user_id="cli_user")
                     print("Session reset. Conversation history cleared.")
                     continue
                 

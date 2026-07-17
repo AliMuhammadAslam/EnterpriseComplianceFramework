@@ -117,13 +117,7 @@ class UploadManager:
         return manifest.get("documents", [])
 
     def delete_document(self, user_id: str, doc_id: str) -> bool:
-        """Delete a specific document and its chunks.
-        
-        Note: ChromaDB doesn't support deletion by metadata filter natively
-        in all versions. This deletes the backing file and manifest entry.
-        To fully remove from vector store, the user's collection can be
-        rebuilt.
-        """
+        """Delete a specific document: its vector store chunks, backing file, and manifest entry."""
         manifest = self._load_manifest(user_id)
         documents = manifest.get("documents", [])
 
@@ -135,6 +129,9 @@ class UploadManager:
 
         if not doc_to_delete:
             return False
+
+        # Remove this document's chunks from the vector store
+        self.vector_store.delete_company_document(user_id, doc_id)
 
         # Delete stored file
         user_dir = os.path.join(self.upload_dir, user_id)
@@ -148,7 +145,7 @@ class UploadManager:
         ]
         self._save_manifest(user_id, manifest)
 
-        # If no documents left, delete the vector store collection
+        # Safety net for any pre-existing orphaned chunks from before this fix
         if not manifest["documents"]:
             self.vector_store.delete_company_collection(user_id)
 

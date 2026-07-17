@@ -21,6 +21,10 @@ app = Flask(__name__)
 INDUSTRY = "Fintech"
 COUNTRY = "Pakistan"
 
+# Caps report generation within the LLM's token budget; the UI enforces this
+# too, this is the server-side safety net for direct API calls.
+MAX_STANDARDS_PER_EVALUATION = 10
+
 orchestrator = Orchestrator()
 audit = AuditLogger()
 report_store = ReportStore()
@@ -240,8 +244,17 @@ def evaluate_compliance():
     try:
         user_id = data.get("user_id", "default")
         standards = data.get("standards", None)
+        doc_ids = data.get("doc_ids", None) or None
         industry = INDUSTRY
         country = COUNTRY
+
+        if standards and len(standards) > MAX_STANDARDS_PER_EVALUATION:
+            return jsonify({
+                "error": (
+                    f"Too many standards selected ({len(standards)}). "
+                    f"Maximum {MAX_STANDARDS_PER_EVALUATION} standards per evaluation."
+                )
+            }), 400
 
         doc_count = orchestrator.upload_manager.get_user_doc_count(user_id)
         if doc_count == 0:
@@ -260,6 +273,7 @@ def evaluate_compliance():
                 standards=standards,
                 industry=industry,
                 country=country,
+                doc_ids=doc_ids,
                 verbose=True,
             )
         output_lines = captured_output.getvalue().split("\n")
@@ -526,7 +540,7 @@ def reset():
     """Reset the current session memory."""
     try:
         user_id = (request.get_json(silent=True) or {}).get("user_id", "default")
-        orchestrator.reset_session()
+        orchestrator.reset_session(user_id=user_id)
 
         audit.log(
             action="SESSION_RESET",
