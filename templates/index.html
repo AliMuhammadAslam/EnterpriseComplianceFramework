@@ -241,6 +241,13 @@
 
         .doc-item .delete-btn:hover { color: var(--error); }
 
+        .doc-item .doc-select-checkbox {
+            margin-right: 0.5rem;
+            accent-color: var(--accent);
+            cursor: pointer;
+            flex-shrink: 0;
+        }
+
         /* Evaluation form */
         .eval-form {
             display: flex;
@@ -1238,7 +1245,9 @@
                     </button>
                     <div class="panel-body open" id="evalPanel">
                         <div class="eval-form">
-                            <label>Select Standards to Evaluate</label>
+                            <label>Select Standards to Evaluate
+                                <span id="standardsCounter" style="font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text-muted);"></span>
+                            </label>
                             <div class="standards-grid" id="standardsGrid"></div>
                             <button class="btn-success" onclick="runEvaluation()" id="evalButton">
                                 Run Compliance Evaluation
@@ -1481,6 +1490,8 @@
         // ------------------------------------------------------------------
         // Standards Grid (populated dynamically from /knowledge/standards)
         // ------------------------------------------------------------------
+        const MAX_STANDARDS_PER_EVALUATION = 10;  // keeps report generation within the LLM's token budget
+
         async function loadStandardsGrid() {
             const grid = document.getElementById('standardsGrid');
             try {
@@ -1497,8 +1508,28 @@
                         <span class="std-check-label">${std}</span>`;
                     grid.appendChild(label);
                 });
+                grid.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+                    cb.addEventListener('change', enforceStandardsCap);
+                });
+                enforceStandardsCap();
             } catch (e) {
                 grid.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">Failed to load standards</div>';
+            }
+        }
+
+        function enforceStandardsCap() {
+            const all = document.querySelectorAll('#standardsGrid input[type="checkbox"]');
+            const checkedCount = document.querySelectorAll('#standardsGrid input[type="checkbox"]:checked').length;
+            const atCap = checkedCount >= MAX_STANDARDS_PER_EVALUATION;
+
+            all.forEach(cb => {
+                if (!cb.checked) cb.disabled = atCap;
+            });
+
+            const counter = document.getElementById('standardsCounter');
+            if (counter) {
+                counter.textContent = `(${checkedCount}/${MAX_STANDARDS_PER_EVALUATION} selected)`;
+                counter.style.color = atCap ? 'var(--error, #ef4444)' : 'var(--text-muted)';
             }
         }
 
@@ -1514,6 +1545,15 @@
         function getSelectedStandards() {
             const boxes = document.querySelectorAll('#standardsGrid input[type="checkbox"]:checked');
             return Array.from(boxes).map(cb => cb.value);
+        }
+
+        function getSelectedDocIds() {
+            const boxes = document.querySelectorAll('#docList .doc-select-checkbox:checked');
+            return Array.from(boxes).map(cb => cb.dataset.docId);
+        }
+
+        function getTotalDocCount() {
+            return document.querySelectorAll('#docList .doc-select-checkbox').length;
         }
 
         // ------------------------------------------------------------------
@@ -1580,8 +1620,8 @@
             document.querySelectorAll('#standardsGrid input[type="checkbox"]').forEach(cb => {
                 cb.checked = DEFAULT_CHECKED_STANDARDS.includes(cb.value);
             });
+            enforceStandardsCap();
 
-            showWelcomeMessage(meta.name);
             loadDocuments();
             loadReports();
             loadAuditLogs();
@@ -1672,6 +1712,8 @@
                     const div = document.createElement('div');
                     div.className = 'doc-item';
                     div.innerHTML = `
+                        <input type="checkbox" class="doc-select-checkbox" data-doc-id="${doc.doc_id}" checked
+                            title="Include this document in the next evaluation">
                         <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
                         <span class="doc-meta">${doc.chunk_count} chunks</span>
                         <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete">✕</button>`;
@@ -1735,13 +1777,22 @@
         // Evaluation
         // ------------------------------------------------------------------
         async function runEvaluation() {
+            const totalDocs = getTotalDocCount();
+            const docIds = getSelectedDocIds();
+
+            if (totalDocs > 0 && docIds.length === 0) {
+                showToast('Select at least one company document to evaluate', 'error');
+                return;
+            }
+
             const btn = document.getElementById('evalButton');
             btn.disabled = true;
             btn.textContent = 'Evaluating...';
 
             const standards = getSelectedStandards();
 
-            addMessage('user', `Run compliance evaluation against ${standards.length} standard(s) - Fintech / Pakistan`);
+            const docLabel = totalDocs > 0 ? `, ${docIds.length}/${totalDocs} document(s)` : '';
+            addMessage('user', `Run compliance evaluation against ${standards.length} standard(s)${docLabel} - Fintech / Pakistan`);
             showTyping(true);
 
             const logsContent = document.getElementById('logsContent');
@@ -1751,7 +1802,7 @@
                 const res = await fetch('/evaluate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: USER_ID, standards })
+                    body: JSON.stringify({ user_id: USER_ID, standards, doc_ids: docIds })
                 });
                 const data = await res.json();
                 showTyping(false);

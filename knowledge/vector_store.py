@@ -1,6 +1,6 @@
 import os
 import chromadb
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from utils.logger import logger_instance
 from knowledge.embeddings import EmbeddingService
 from dotenv import load_dotenv
@@ -96,18 +96,28 @@ class VectorStore:
         )
 
     def query_company_documents(
-        self, user_id: str, query: str, top_k: int = 5
+        self,
+        user_id: str,
+        query: str,
+        top_k: int = 5,
+        doc_ids: Optional[List[str]] = None,
     ) -> List[Dict[str, Any]]:
-        """Query a user's company document collection."""
+        """Query a user's company document collection.
+
+        If doc_ids is given, restricts results to chunks from those specific
+        documents so an evaluation doesn't blend unrelated uploaded files.
+        """
         collection_name = f"company_docs_{user_id}"
         try:
             collection = self.client.get_collection(collection_name)
             if collection.count() == 0:
                 return []
             query_embedding = self.embedding_service.embed_text(query)
+            where_filter = {"doc_id": {"$in": doc_ids}} if doc_ids else None
             results = collection.query(
                 query_embeddings=[query_embedding],
                 n_results=min(top_k, collection.count()),
+                where=where_filter,
             )
             return self._format_results(results)
         except Exception as e:
@@ -134,6 +144,16 @@ class VectorStore:
             self.logger.info(f"Deleted collection: {collection_name}")
         except Exception as e:
             self.logger.error(f"Error deleting collection: {e}")
+
+    def delete_company_document(self, user_id: str, doc_id: str):
+        """Delete a single document's chunks from a user's collection by doc_id."""
+        collection_name = f"company_docs_{user_id}"
+        try:
+            collection = self.client.get_collection(collection_name)
+            collection.delete(where={"doc_id": doc_id})
+            self.logger.info(f"Deleted chunks for doc_id {doc_id} from {collection_name}")
+        except Exception as e:
+            self.logger.error(f"Error deleting document {doc_id} from {collection_name}: {e}")
 
     def _format_results(self, results: dict) -> List[Dict[str, Any]]:
         """Format ChromaDB query results into a clean list of dicts."""
