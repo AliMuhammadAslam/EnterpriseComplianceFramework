@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/ChromaDB-1E1E2E?style=for-the-badge" alt="ChromaDB">
 </p>
 
-An AI-powered compliance evaluation platform that helps organisations assess their security and regulatory posture against major industry standards. Built on a structured Planning + Execution agent architecture with a RAG (Retrieval-Augmented Generation) pipeline, company document ingestion, and a structured compliance evaluation engine.
+An AI-powered compliance evaluation platform that helps organisations assess their security and regulatory posture against major industry standards. Built on a structured Planning + Execution agent architecture with a RAG (Retrieval-Augmented Generation) pipeline, company document ingestion, a structured compliance evaluation engine, and a session-based login for per-user data isolation.
 
 ---
 
@@ -17,8 +17,10 @@ An AI-powered compliance evaluation platform that helps organisations assess the
 
 ```mermaid
 graph TD
-    subgraph Input
+    subgraph Access
+        AUTH[Session Login\nRequired for web routes]
         UI[Web UI / CLI]
+        AUTH --> UI
     end
 
     subgraph Agent Core
@@ -28,7 +30,7 @@ graph TD
         RAG --> PLAN[Planner\nStep Generation]
         PLAN --> EXEC[Executor\nStep Execution]
         EXEC --> LLM[LLM\nGPT-4o via litellm]
-        LLM --> MEM[Memory\nSession + Persistent]
+        LLM --> MEM[Memory\nPer-user Session + Persistent]
         MEM --> ORCH
     end
 
@@ -49,7 +51,7 @@ graph TD
         UI -->|evaluate| EVAL[Evaluation Engine]
         EVAL --> RAG
         EVAL --> LLM
-        EVAL --> RPT[Structured Report\nGap Analysis + Recommendations]
+        EVAL --> RPT[Structured Report\nCoverage + Gap Analysis + Risk Score]
     end
 ```
 
@@ -59,12 +61,15 @@ graph TD
 
 ```
 .
+├── auth/
+│   └── user_store.py         # Fixed user accounts with hashed passwords (werkzeug)
+│
 ├── agent/
-│   ├── orchestrator.py       # Central coordinator — runs the full pipeline
+│   ├── orchestrator.py       # Central coordinator that runs the full pipeline
 │   ├── perception.py         # Intent classification (LLM + keyword fallback)
 │   ├── planner.py            # LLM-based step-plan generation with RAG context
 │   ├── executor.py           # Executes plan steps via LLM reasoning
-│   └── memory.py             # Short-term (session) + long-term (JSON) memory
+│   └── memory.py             # Per-user session memory + long-term JSON persistence
 │
 ├── knowledge/
 │   ├── vector_store.py       # ChromaDB wrapper with per-user namespace isolation
@@ -93,13 +98,12 @@ graph TD
 │   └── secp_guidelines.md
 │
 ├── document_upload/
-│   ├── manager.py            # Full upload pipeline: validate → parse → chunk → embed → store
+│   ├── manager.py            # Full upload pipeline: validate, parse, chunk, embed, store
 │   ├── parser.py             # Text extraction for PDF, DOCX, and TXT files
 │   └── chunker.py            # Word-count-based chunking with configurable overlap
 │
 ├── evaluation/
 │   ├── engine.py             # RAG-powered compliance gap analysis engine
-│   ├── report.py             # Pydantic report models + Markdown formatter
 │   └── report_store.py       # Persists and retrieves evaluation reports per user
 │
 ├── audit/
@@ -109,12 +113,36 @@ graph TD
 │   └── logger.py             # Singleton logger (component-scoped)
 │
 ├── templates/
+│   ├── login.html            # Login page
 │   └── index.html            # Single-page web UI (chat + document upload + evaluation)
 │
-├── web_app.py                # Flask web server and REST API
+├── web_app.py                # Flask web server, authentication, and REST API
 ├── main.py                   # CLI entry point (interactive and batch modes)
 └── requirements.txt
 ```
+
+> On first startup the app seeds a `users.json` file with the default accounts (see Authentication). This file holds hashed passwords and is gitignored, so it regenerates if deleted.
+
+---
+
+## Authentication
+
+The web application is protected by a session-based login. Accounts are fixed (there is no public sign-up), and every data route requires an authenticated session. The logged-in user's identity is taken from the server session, never from the request body, so a client cannot act as another user.
+
+Passwords are hashed with `werkzeug.security` and stored in `users.json`, which is created and seeded automatically on first run.
+
+### Default accounts
+
+| Username | Password | Name | Role |
+|---|---|---|---|
+| `john` | `john123` | John Smith | Default User |
+| `sarah` | `sarah123` | Sarah Johnson | Analyst |
+| `michael` | `michael123` | Michael Chen | Auditor |
+| `emily` | `emily123` | Emily Davis | Compliance Officer |
+
+These are demo credentials. To change a password or add an account, edit `auth/user_store.py` and delete `users.json` so it reseeds on the next start. Each account maps to its own data namespace, so uploaded documents and reports stay isolated per user.
+
+> The command-line interface (`main.py`) is a local developer tool and does not use the login layer.
 
 ---
 
@@ -129,62 +157,78 @@ Every user query follows a fixed pipeline:
 | 2 | **RAG Pipeline** | Retrieves relevant chunks from the regulatory knowledge base and the user's uploaded company documents |
 | 3 | **Planner** | Uses the LLM to generate a structured JSON step-plan, enriched with the RAG context |
 | 4 | **Executor** | Executes each plan step sequentially, injecting RAG context into every LLM call |
-| 5 | **Memory** | Stores the interaction in short-term session memory and persists it to `agent_memory.json` |
+| 5 | **Memory** | Stores the interaction in per-user session memory and persists it to `agent_memory.json` |
+
+Conversation memory is scoped per user, so follow-up questions keep their context and one user's session reset never affects another user's history.
 
 ### RAG & Knowledge Layer
 - **Regulatory KB**: Eighteen authoritative compliance standards pre-loaded from `knowledge_data/` into a shared `regulatory_knowledge` ChromaDB collection on first startup.
 - **Company Documents**: User-uploaded documents are parsed, chunked, embedded, and stored in a per-user isolated collection (`company_docs_{user_id}`).
-- **Context injection**: RAG context is injected at three levels — Planner prompt, each Executor LLM call, and the final result compilation — ensuring citation-backed responses throughout.
+- **Context injection**: RAG context is injected at three levels: the Planner prompt, each Executor LLM call, and the final result compilation, so responses stay citation-backed throughout.
 
 ### Audit Trail
 Every system action is recorded to `audit_logs/audit_log.jsonl` via the `AuditLogger` singleton. Tracked actions include:
 
 | Action | Description |
 |---|---|
+| `LOGIN` | User signed in (success or failure) |
+| `LOGOUT` | User signed out |
 | `CHAT_QUERY` | User sent a chat query |
 | `DOCUMENT_UPLOAD` | Document uploaded to the system |
 | `DOCUMENT_DELETE` | Document deleted from the system |
 | `EVALUATION_RUN` | Compliance evaluation executed |
 | `REPORT_DOWNLOAD` | Evaluation report downloaded |
+| `REPORT_DELETE` | Evaluation report deleted |
 | `KNOWLEDGE_DOWNLOAD` | Regulatory knowledge document downloaded |
 | `SESSION_RESET` | User session reset |
-| `KNOWLEDGE_INGEST` | Knowledge base ingested or re-ingested |
 | `SYSTEM_START` | Application started |
+| `SESSION_END` | Application shut down |
 
-The audit log supports filtering by `user_id`, `action`, `resource_type`, timestamp range, and status, and can be exported as CSV for compliance reporting.
+The audit log supports filtering by `action`, `resource_type`, timestamp range, and status. Each user's queries and export are scoped to their own actions.
 
 ### Report Store
 Evaluation reports are persisted as JSON files under `reports/{user_id}/{report_id}.json` by `ReportStore`. Reports can be listed, retrieved, downloaded as Markdown, or deleted via the API.
 
 ### Compliance Evaluation Engine
 Triggered via the `/evaluate` endpoint or the web UI. The engine:
-1. Retrieves the user's company documents via RAG
-2. Retrieves the relevant regulatory standards via RAG
-3. Sends a structured prompt to the LLM for gap analysis
-4. Returns a formatted Markdown report covering: Executive Summary, Compliant Areas, Gap Analysis (with risk levels), Risk Assessment, and Prioritised Recommendations
+1. Retrieves the user's company documents via RAG, optionally restricted to specific selected documents
+2. Retrieves the relevant regulatory standards via one query per standard, which avoids similarity crowding
+3. Sends a structured prompt to the LLM for gap analysis at temperature 0
+4. Returns a formatted Markdown report
+
+The report covers:
+- **Executive Summary**
+- **Standards Coverage**: a status line for every selected standard, marked Findings, Documentation gap, or Not applicable, so no standard is silently dropped
+- **Compliant Areas** with standard references
+- **Gap Analysis** with risk levels (Critical / High / Medium / Low)
+- **Risk Assessment** (likelihood and impact)
+- **Regulatory Risk Score and Prioritization**: a transparent score per gap computed as Obligation Severity x Likelihood x Adequacy Gap, sorted highest to lowest
+- **Recommendations** ordered by priority with effort estimates
+
+An evaluation can target up to ten standards at a time, which keeps report generation within the model's token budget.
 
 ### Supported Standards
 
 | Standard | Domain |
 |---|---|
 | ISO 27001 | Information Security Management |
-| SOC 2 | Security, Availability & Confidentiality |
+| SOC 2 | Security, Availability and Confidentiality |
 | GDPR | EU Data Protection |
 | NIST CSF | Cybersecurity Framework |
 | HIPAA | Healthcare Data Privacy |
 | PCI DSS | Payment Card Security |
-| COBIT | IT Governance & Management |
+| COBIT | IT Governance and Management |
 | ISO 22301 | Business Continuity Management |
 | ISO 31000 | Risk Management |
-| CSA CCM | Cloud Security Alliance — Cloud Controls Matrix |
-| Basel Framework | Banking Capital & Risk Regulation |
+| CSA CCM | Cloud Security Alliance, Cloud Controls Matrix |
+| Basel Framework | Banking Capital and Risk Regulation |
 | PSD2 / Open Banking | EU Payment Services Directive |
 | SWIFT CSP | SWIFT Customer Security Programme |
 | FATF Guidelines | Anti-Money Laundering / Counter-Terrorist Financing |
-| Pakistan AML/CFT | Pakistan AML & CFT Rules |
+| Pakistan AML/CFT | Pakistan AML and CFT Rules |
 | PECA 2016 | Pakistan Electronic Crime Act |
 | SBP Regulations | State Bank of Pakistan Regulations |
-| SECP Guidelines | Securities & Exchange Commission of Pakistan |
+| SECP Guidelines | Securities and Exchange Commission of Pakistan |
 
 ---
 
@@ -230,10 +274,14 @@ Copy the example below into a `.env` file in the project root and fill in your A
 # Required
 OPENAI_API_KEY=your-openai-api-key-here
 
+# Authentication
+SECRET_KEY=change-this-to-a-long-random-string
+USERS_FILE=./users.json
+
 # LLM Settings
 DEFAULT_MODEL=gpt-4o
 TEMPERATURE=0.7
-MAX_TOKENS=4000
+MAX_TOKENS=6000
 MAX_ITERATIONS=5
 
 # Memory
@@ -261,7 +309,9 @@ AUDIT_LOG_DIR=./audit_logs
 LOG_LEVEL=INFO
 ```
 
-> **Note:** On first startup the system ingests all files from `knowledge_data/` into ChromaDB. It also re-ingests automatically whenever those files change, so no manual steps are needed after updating a knowledge file.
+> Set `SECRET_KEY` to a long random value. It signs the session cookie, so keep it private and out of version control.
+
+> On first startup the system ingests all files from `knowledge_data/` into ChromaDB. It also re-ingests automatically whenever those files change, so no manual steps are needed after updating a knowledge file.
 
 ---
 
@@ -273,9 +323,9 @@ LOG_LEVEL=INFO
 python web_app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser.
+Open [http://localhost:5000](http://localhost:5000) in your browser. You will be redirected to the login page. Sign in with one of the default accounts, for example `john` / `john123`. To switch users, sign out and sign back in as another account.
 
-### CLI — Interactive Mode
+### CLI, Interactive Mode
 
 ```bash
 python main.py --mode interactive
@@ -290,7 +340,7 @@ Available commands inside the session:
 | `verbose` | Toggle verbose step-by-step output |
 | `quit` / `exit` | Exit the session |
 
-### CLI — Batch Mode
+### CLI, Batch Mode
 
 ```bash
 python main.py --mode batch --query "What are the key controls under ISO 27001 Annex A?"
@@ -311,47 +361,54 @@ Optional flags:
 Ask any compliance-related question in the chat panel. The agent retrieves relevant regulatory context and your uploaded company documents before responding.
 
 **Example queries:**
-- *"What are the key requirements of GDPR Article 32?"*
-- *"How does our security policy align with NIST CSF?"*
-- *"What controls does ISO 27001 require for access management?"*
+- *What are the key requirements of GDPR Article 32?*
+- *How does our security policy align with NIST CSF?*
+- *What controls does ISO 27001 require for access management?*
 
 ### Document Upload
-Drag and drop — or click to browse — a company document (PDF, DOCX, or TXT, max 50 MB) into the upload panel. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
+Drag and drop, or click to browse, a company document (PDF, DOCX, or TXT, max 50 MB) into the upload panel. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
 
 ### Compliance Evaluation
-1. Select one or more standards from the evaluation panel
-2. Enter your industry and country
-3. Click **Run Evaluation**
+1. Select which uploaded documents to include using the checkboxes
+2. Select up to ten standards from the evaluation panel
+3. Click **Run Compliance Evaluation**
 
-The system retrieves your uploaded documents and the relevant regulatory standards, then produces a structured report with:
+The system retrieves your selected documents and the relevant regulatory standards, then produces a structured report with:
 - Executive summary
-- Compliant areas (with evidence)
+- Standards coverage (Findings, Documentation gap, or Not applicable per standard)
+- Compliant areas (with references)
 - Gap analysis (with risk levels: Critical / High / Medium / Low)
-- Risk assessment (likelihood × impact)
+- Risk assessment (likelihood and impact)
+- A regulatory risk score and prioritization table
 - Prioritised recommendations (with effort estimates)
 
 ---
 
 ## REST API Reference
 
+All data endpoints require an authenticated session. Requests without a valid session receive `401 Authentication required`, and the browser is redirected to the login page. The active user is derived from the session, so `user_id` is never passed by the client.
+
 | Method | Endpoint | Description |
 |---|---|---|
-| `POST` | `/chat` | Send a message; body: `{message, user_id, verbose}` |
-| `POST` | `/upload` | Upload a document; multipart form: `file`, `user_id` |
-| `GET` | `/documents?user_id=` | List documents uploaded by a user |
-| `DELETE` | `/documents/<doc_id>?user_id=` | Delete a specific document |
-| `POST` | `/evaluate` | Run compliance evaluation; body: `{user_id, standards, industry, country}` |
-| `GET` | `/reports?user_id=` | List saved evaluation reports for a user |
-| `GET` | `/reports/<report_id>?user_id=` | Retrieve a specific report |
-| `GET` | `/reports/<report_id>/download?user_id=` | Download a report as a Markdown file |
-| `GET` | `/audit/logs` | Query audit trail (filters: `user_id`, `action`, `resource_type`, `start_date`, `end_date`, `status`, `limit`, `offset`) |
-| `GET` | `/audit/summary` | Aggregate audit statistics (event counts by action and user) |
-| `GET` | `/audit/export` | Export audit log as CSV |
+| `GET` / `POST` | `/login` | Show the login page (GET) or authenticate a username and password (POST) |
+| `POST` | `/logout` | Clear the session |
+| `POST` | `/chat` | Send a message; body: `{message, verbose}` |
+| `POST` | `/upload` | Upload a document; multipart form: `file` |
+| `GET` | `/documents` | List documents uploaded by the current user |
+| `DELETE` | `/documents/<doc_id>` | Delete a specific document and its vector chunks |
+| `POST` | `/evaluate` | Run compliance evaluation; body: `{standards, doc_ids}` (max 10 standards) |
+| `GET` | `/reports` | List saved evaluation reports for the current user |
+| `GET` | `/reports/<report_id>` | Retrieve a specific report |
+| `DELETE` | `/reports/<report_id>` | Delete a specific report |
+| `GET` | `/reports/<report_id>/download` | Download a report as a Markdown file |
+| `GET` | `/audit/logs` | Query the current user's audit trail (filters: `action`, `resource_type`, `start_date`, `end_date`, `status`, `limit`, `offset`) |
+| `GET` | `/audit/summary` | Aggregate audit statistics |
+| `GET` | `/audit/export` | Export the current user's audit log as CSV |
 | `GET` | `/status` | System component status |
 | `GET` | `/knowledge/status` | Regulatory knowledge base status |
 | `GET` | `/knowledge/standards` | List all loaded regulatory standards with metadata |
-| `GET` | `/knowledge/standards/<filename>/download?user_id=` | Download a regulatory standard document as a Markdown file |
-| `POST` | `/reset` | Reset the current session memory |
+| `GET` | `/knowledge/standards/<filename>/download` | Download a regulatory standard document as a Markdown file |
+| `POST` | `/reset` | Reset the current user's session memory |
 
 ---
 
@@ -359,7 +416,11 @@ The system retrieves your uploaded documents and the relevant regulatory standar
 
 ### Adding a New Regulatory Standard
 1. Add a `.md` or `.txt` file to `knowledge_data/`
-2. Restart the application — it detects the change and re-ingests automatically
+2. Restart the application, which detects the change and re-ingests automatically
+
+### Adding or Changing a User Account
+1. Edit the account list in `auth/user_store.py`
+2. Delete `users.json` so it reseeds on the next start
 
 ---
 
@@ -369,10 +430,12 @@ All settings are controlled via environment variables with sensible defaults bui
 
 | Variable | Default | Description |
 |---|---|---|
-| `OPENAI_API_KEY` | — | OpenAI API key (required) |
+| `OPENAI_API_KEY` | required | OpenAI API key |
+| `SECRET_KEY` | `dev-secret-change-me` | Secret used to sign the session cookie |
+| `USERS_FILE` | `./users.json` | Path to the seeded user account store |
 | `DEFAULT_MODEL` | `gpt-4o` | LLM model name (any litellm-supported model) |
 | `TEMPERATURE` | `0.7` | LLM temperature for orchestration |
-| `MAX_TOKENS` | `4000` | Max tokens per LLM response |
+| `MAX_TOKENS` | `4000` | Max tokens per LLM response (set higher for large evaluations) |
 | `CHROMA_DB_PATH` | `./chroma_db` | ChromaDB persistence directory |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `CHUNK_SIZE` | `500` | Words per document chunk |
