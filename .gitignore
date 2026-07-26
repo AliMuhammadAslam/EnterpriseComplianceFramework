@@ -4,6 +4,7 @@ chroma_db/
 uploads/
 *.pyc
 agent_memory.json
+users.json
 venv/
 *.log
 pytest_out.txt
