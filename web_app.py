@@ -4,18 +4,27 @@ import signal
 import atexit
 import tempfile
 import io
+from functools import wraps
 from datetime import datetime
 from contextlib import redirect_stdout
 
-from flask import Flask, render_template, request, jsonify
+from flask import (
+    Flask, render_template, request, jsonify, session, redirect, url_for
+)
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.orchestrator import Orchestrator
 from audit.audit_logger import AuditLogger
 from evaluation.report_store import ReportStore
+from auth.user_store import UserStore
 
 app = Flask(__name__)
+app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+)
 
 # Thesis scope: fintech industry in Pakistan
 INDUSTRY = "Fintech"
@@ -28,6 +37,7 @@ MAX_STANDARDS_PER_EVALUATION = 10
 orchestrator = Orchestrator()
 audit = AuditLogger()
 report_store = ReportStore()
+user_store = UserStore()
 
 audit.log(action="SYSTEM_START", details={"host": "localhost", "port": 5000})
 
@@ -65,24 +75,113 @@ def _get_client_ip():
     return request.headers.get("X-Forwarded-For", request.remote_addr) or ""
 
 
+@app.after_request
+def add_no_cache_headers(response):
+    """Stop the browser caching signed-in pages.
+
+    Without this the back button can serve a logged-in page from cache after
+    the user has signed out, showing the previous user's details.
+    """
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
+
+
+def login_required(f):
+    """Reject unauthenticated data requests with a 401."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if not session.get("user_id"):
+            return jsonify({"error": "Authentication required"}), 401
+        return f(*args, **kwargs)
+    return wrapper
+
+
+def _current_user_id():
+    """The logged-in user's data key, taken from the session, never the client."""
+    return session.get("user_id", "")
+
+
+# ------------------------------------------------------------------
+# Authentication routes
+# ------------------------------------------------------------------
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    """Show the login page and authenticate a fixed account."""
+    if request.method == "GET":
+        if session.get("user_id"):
+            return redirect(url_for("index"))
+        return render_template("login.html")
+
+    username = request.form.get("username", "")
+    password = request.form.get("password", "")
+    profile = user_store.verify(username, password)
+
+    if not profile:
+        audit.log(
+            action="LOGIN",
+            user_id=(username or "unknown").strip().lower(),
+            status="failure",
+            details={"reason": "invalid credentials"},
+            ip_address=_get_client_ip(),
+        )
+        return render_template(
+            "login.html", error="Invalid username or password"
+        ), 401
+
+    session.clear()
+    session["user_id"] = profile["user_id"]
+    session["username"] = profile["username"]
+    session["name"] = profile["name"]
+    session["role"] = profile["role"]
+    audit.log(
+        action="LOGIN",
+        user_id=profile["user_id"],
+        status="success",
+        ip_address=_get_client_ip(),
+    )
+    return redirect(url_for("index"))
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    """Clear the session and return to the login page."""
+    uid = session.get("user_id", "")
+    session.clear()
+    if uid:
+        audit.log(action="LOGOUT", user_id=uid, ip_address=_get_client_ip())
+    return jsonify({"message": "Logged out"})
+
+
 # ------------------------------------------------------------------
 # Core routes
 # ------------------------------------------------------------------
 
 @app.route("/")
 def index():
-    """Serve the main web interface."""
-    return render_template("index.html")
+    """Serve the main web interface, or the login page if not signed in."""
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+    return render_template(
+        "index.html",
+        user_id=session["user_id"],
+        user_name=session.get("name", ""),
+        user_role=session.get("role", ""),
+        username=session.get("username", ""),
+    )
 
 
 @app.route("/chat", methods=["POST"])
+@login_required
 def chat():
     """Process a chat message through the compliance agent pipeline."""
     data = request.get_json() or {}
     try:
         user_message = data.get("message", "")
         verbose = data.get("verbose", False)
-        user_id = data.get("user_id", "default")
+        user_id = _current_user_id()
 
         if not user_message.strip():
             return jsonify({"error": "Empty message"})
@@ -126,7 +225,7 @@ def chat():
     except Exception as e:
         audit.log(
             action="CHAT_QUERY",
-            user_id=data.get("user_id", "default"),
+            user_id=_current_user_id(),
             status="failure",
             details={"error": str(e)},
             ip_address=_get_client_ip(),
@@ -135,6 +234,7 @@ def chat():
 
 
 @app.route("/upload", methods=["POST"])
+@login_required
 def upload_document():
     """Upload a company document (PDF, DOCX, TXT) for compliance analysis."""
     try:
@@ -142,7 +242,7 @@ def upload_document():
             return jsonify({"error": "No file provided"}), 400
 
         file = request.files["file"]
-        user_id = request.form.get("user_id", "default")
+        user_id = _current_user_id()
 
         if file.filename == "":
             return jsonify({"error": "No file selected"}), 400
@@ -198,10 +298,11 @@ def upload_document():
 
 
 @app.route("/documents", methods=["GET"])
+@login_required
 def list_documents():
     """List all documents uploaded by a user."""
     try:
-        user_id = request.args.get("user_id", "default")
+        user_id = _current_user_id()
         documents = orchestrator.upload_manager.list_documents(user_id)
         chunk_count = orchestrator.upload_manager.get_user_doc_count(user_id)
         return jsonify({"documents": documents, "total_chunks": chunk_count})
@@ -210,10 +311,11 @@ def list_documents():
 
 
 @app.route("/documents/<doc_id>", methods=["DELETE"])
+@login_required
 def delete_document(doc_id):
     """Delete a specific uploaded document."""
     try:
-        user_id = request.args.get("user_id", "default")
+        user_id = _current_user_id()
         success = orchestrator.upload_manager.delete_document(user_id, doc_id)
 
         audit.log(
@@ -238,11 +340,12 @@ def delete_document(doc_id):
 # ------------------------------------------------------------------
 
 @app.route("/evaluate", methods=["POST"])
+@login_required
 def evaluate_compliance():
     """Run a compliance evaluation against the user's uploaded documents."""
     data = request.get_json() or {}
     try:
-        user_id = data.get("user_id", "default")
+        user_id = _current_user_id()
         standards = data.get("standards", None)
         doc_ids = data.get("doc_ids", None) or None
         industry = INDUSTRY
@@ -321,7 +424,7 @@ def evaluate_compliance():
     except Exception as e:
         audit.log(
             action="EVALUATION_RUN",
-            user_id=data.get("user_id", "default"),
+            user_id=_current_user_id(),
             status="failure",
             details={"error": str(e)},
             ip_address=_get_client_ip(),
@@ -334,10 +437,11 @@ def evaluate_compliance():
 # ------------------------------------------------------------------
 
 @app.route("/reports", methods=["GET"])
+@login_required
 def list_reports():
     """List saved evaluation reports for a user."""
     try:
-        user_id = request.args.get("user_id", "default")
+        user_id = _current_user_id()
         reports = report_store.list_reports(user_id)
         return jsonify({"reports": reports})
     except Exception as e:
@@ -345,10 +449,11 @@ def list_reports():
 
 
 @app.route("/reports/<report_id>", methods=["GET"])
+@login_required
 def get_report(report_id):
     """Retrieve a specific evaluation report."""
     try:
-        user_id = request.args.get("user_id", "default")
+        user_id = _current_user_id()
         report = report_store.get_report(user_id, report_id)
         if report:
             return jsonify(report)
@@ -358,10 +463,11 @@ def get_report(report_id):
 
 
 @app.route("/reports/<report_id>", methods=["DELETE"])
+@login_required
 def delete_report(report_id):
     """Delete a specific evaluation report."""
     try:
-        user_id = request.args.get("user_id", "default")
+        user_id = _current_user_id()
         success = report_store.delete_report(user_id, report_id)
 
         audit.log(
@@ -381,10 +487,11 @@ def delete_report(report_id):
 
 
 @app.route("/reports/<report_id>/download", methods=["GET"])
+@login_required
 def download_report(report_id):
     """Download a report as markdown text."""
     try:
-        user_id = request.args.get("user_id", "default")
+        user_id = _current_user_id()
         report = report_store.get_report(user_id, report_id)
         if not report:
             return jsonify({"error": "Report not found"}), 404
@@ -412,11 +519,12 @@ def download_report(report_id):
 # ------------------------------------------------------------------
 
 @app.route("/audit/logs", methods=["GET"])
+@login_required
 def audit_logs():
-    """Query audit trail with optional filters."""
+    """Query the current user's audit trail with optional filters."""
     try:
         logs = audit.query(
-            user_id=request.args.get("user_id"),
+            user_id=_current_user_id(),
             action=request.args.get("action"),
             resource_type=request.args.get("resource_type"),
             start_date=request.args.get("start_date"),
@@ -431,6 +539,7 @@ def audit_logs():
 
 
 @app.route("/audit/summary", methods=["GET"])
+@login_required
 def audit_summary():
     """Return audit trail aggregate statistics."""
     try:
@@ -441,6 +550,7 @@ def audit_summary():
 
 
 @app.route("/audit/export", methods=["GET"])
+@login_required
 def audit_export():
     """Export audit trail as CSV."""
     try:
@@ -450,7 +560,7 @@ def audit_export():
         ) as tmp:
             export_path = tmp.name
         try:
-            audit.export_csv(export_path)
+            audit.export_csv(export_path, user_id=_current_user_id())
             with open(export_path, "r", encoding="utf-8") as f:
                 csv_content = f.read()
         finally:
@@ -472,6 +582,7 @@ def audit_export():
 # ------------------------------------------------------------------
 
 @app.route("/status")
+@login_required
 def status():
     """Return system component status."""
     try:
@@ -482,6 +593,7 @@ def status():
 
 
 @app.route("/knowledge/status")
+@login_required
 def knowledge_status():
     """Return knowledge base status including loaded standards."""
     try:
@@ -492,6 +604,7 @@ def knowledge_status():
 
 
 @app.route("/knowledge/standards")
+@login_required
 def knowledge_standards():
     """List all loaded regulatory standards with their metadata."""
     try:
@@ -502,6 +615,7 @@ def knowledge_standards():
 
 
 @app.route("/knowledge/standards/<filename>/download")
+@login_required
 def download_knowledge_standard(filename):
     """Download a regulatory knowledge document as a Markdown file."""
     try:
@@ -518,7 +632,7 @@ def download_knowledge_standard(filename):
 
         audit.log(
             action="KNOWLEDGE_DOWNLOAD",
-            user_id=request.args.get("user_id", "anonymous"),
+            user_id=_current_user_id(),
             resource_type="knowledge",
             resource_id=filename,
             ip_address=_get_client_ip(),
@@ -536,10 +650,11 @@ def download_knowledge_standard(filename):
 
 
 @app.route("/reset", methods=["POST"])
+@login_required
 def reset():
     """Reset the current session memory."""
     try:
-        user_id = (request.get_json(silent=True) or {}).get("user_id", "default")
+        user_id = _current_user_id()
         orchestrator.reset_session(user_id=user_id)
 
         audit.log(

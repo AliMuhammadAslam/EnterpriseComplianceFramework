@@ -423,7 +423,7 @@
             margin-bottom: 0.5rem;
         }
 
-        /* Custom user picker trigger */
+        /* Signed-in user display */
         .user-select-wrapper {
             display: flex;
             align-items: center;
@@ -432,18 +432,7 @@
             border: 1px solid rgba(255,255,255,0.1);
             border-radius: var(--radius-md);
             padding: 0.55rem 0.75rem;
-            cursor: pointer;
-            transition: border-color var(--transition), box-shadow var(--transition);
             user-select: none;
-        }
-
-        .user-select-wrapper:hover {
-            border-color: rgba(255,255,255,0.2);
-        }
-
-        .user-select-wrapper.open {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
         }
 
         .user-avatar {
@@ -477,99 +466,6 @@
             color: var(--text-muted);
             margin-top: 0.05rem;
         }
-
-        .user-select-chevron {
-            color: var(--text-muted);
-            font-size: 0.7rem;
-            flex-shrink: 0;
-            transition: transform var(--transition);
-        }
-
-        .user-select-wrapper.open .user-select-chevron {
-            transform: rotate(180deg);
-        }
-
-        /* Dropdown panel — floats above the session bar */
-        .user-dropdown {
-            display: none;
-            position: absolute;
-            bottom: calc(100% + 6px);
-            left: 1.25rem;
-            right: 1.25rem;
-            background: #1e293b;
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: var(--radius-md);
-            box-shadow: 0 -8px 24px rgba(0,0,0,0.35);
-            overflow: hidden;
-            z-index: 200;
-            animation: dropUp 0.15s ease;
-        }
-
-        @keyframes dropUp {
-            from { opacity: 0; transform: translateY(6px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
-
-        .user-dropdown.open { display: block; }
-
-        .user-dropdown-header {
-            padding: 0.6rem 0.85rem 0.4rem;
-            font-size: 0.63rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.07em;
-            color: var(--text-muted);
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-
-        .user-dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 0.65rem;
-            padding: 0.6rem 0.85rem;
-            cursor: pointer;
-            transition: background var(--transition);
-        }
-
-        .user-dropdown-item:hover {
-            background: rgba(255,255,255,0.05);
-        }
-
-        .user-dropdown-item.active {
-            background: rgba(59,130,246,0.1);
-        }
-
-        .user-dropdown-item .item-avatar {
-            width: 28px; height: 28px;
-            border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 0.72rem;
-            font-weight: 700;
-            color: white;
-            flex-shrink: 0;
-            text-transform: uppercase;
-        }
-
-        .user-dropdown-item .item-text { flex: 1; min-width: 0; }
-        .user-dropdown-item .item-name {
-            font-size: 0.82rem;
-            font-weight: 500;
-            color: var(--text-inverse);
-        }
-        .user-dropdown-item .item-role {
-            font-size: 0.67rem;
-            color: var(--text-muted);
-            margin-top: 0.05rem;
-        }
-
-        .user-dropdown-item .item-check {
-            font-size: 0.75rem;
-            color: var(--accent);
-            flex-shrink: 0;
-            opacity: 0;
-        }
-
-        .user-dropdown-item.active .item-check { opacity: 1; }
 
         /* ---- Main Content ---- */
         .main-content {
@@ -1299,51 +1195,15 @@
 
             <!-- Session Bar -->
             <div class="session-bar">
-                <!-- Dropdown panel (floats above) -->
-                <div class="user-dropdown" id="userDropdown">
-                    <div class="user-dropdown-header">Switch User</div>
-                    <div class="user-dropdown-item active" data-value="default" onclick="selectUser('default')">
-                        <div class="item-avatar" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6)">JS</div>
-                        <div class="item-text">
-                            <div class="item-name">John Smith</div>
-                            <div class="item-role">Default User</div>
-                        </div>
-                        <span class="item-check">✓</span>
-                    </div>
-                    <div class="user-dropdown-item" data-value="analyst" onclick="selectUser('analyst')">
-                        <div class="item-avatar" style="background:linear-gradient(135deg,#10b981,#059669)">SJ</div>
-                        <div class="item-text">
-                            <div class="item-name">Sarah Johnson</div>
-                            <div class="item-role">Analyst</div>
-                        </div>
-                        <span class="item-check">✓</span>
-                    </div>
-                    <div class="user-dropdown-item" data-value="auditor" onclick="selectUser('auditor')">
-                        <div class="item-avatar" style="background:linear-gradient(135deg,#f59e0b,#d97706)">MC</div>
-                        <div class="item-text">
-                            <div class="item-name">Michael Chen</div>
-                            <div class="item-role">Auditor</div>
-                        </div>
-                        <span class="item-check">✓</span>
-                    </div>
-                    <div class="user-dropdown-item" data-value="admin" onclick="selectUser('admin')">
-                        <div class="item-avatar" style="background:linear-gradient(135deg,#ef4444,#dc2626)">ED</div>
-                        <div class="item-text">
-                            <div class="item-name">Emily Davis</div>
-                            <div class="item-role">Compliance Officer</div>
-                        </div>
-                        <span class="item-check">✓</span>
-                    </div>
-                </div>
-
-                <div class="session-bar-label">Active User</div>
-                <div class="user-select-wrapper" id="userSelectWrapper" onclick="toggleUserDropdown()">
-                    <div class="user-avatar" id="userAvatar" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6)">JS</div>
+                <div class="session-bar-label">Signed in as</div>
+                <div class="user-select-wrapper" id="userSelectWrapper" style="cursor:default">
+                    <div class="user-avatar" id="userAvatar" style="background:linear-gradient(135deg,#3b82f6,#8b5cf6)">--</div>
                     <div class="user-select-info">
-                        <div class="user-display-name" id="userDisplayName">John Smith</div>
-                        <div class="user-display-role" id="userDisplayRole">Default User</div>
+                        <div class="user-display-name" id="userDisplayName">{{ user_name }}</div>
+                        <div class="user-display-role" id="userDisplayRole">{{ user_role }}</div>
                     </div>
-                    <span class="user-select-chevron">▾</span>
+                    <button id="logoutBtn" onclick="logout()" title="Sign out"
+                        style="background:none;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.3rem 0.55rem;font-size:0.95rem;cursor:pointer;color:rgba(255,255,255,0.7);margin-left:auto;">⏻</button>
                 </div>
             </div>
         </aside>
@@ -1434,7 +1294,7 @@
         // ------------------------------------------------------------------
         // State
         // ------------------------------------------------------------------
-        let USER_ID = 'default';
+        let USER_ID = {{ user_id|tojson }};
         let _chatInFlight = false;  // guards against duplicate concurrent sends
 
         // Default-checked standards for fintech / Pakistan context
@@ -1447,7 +1307,8 @@
         // Init
         // ------------------------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
-            showWelcomeMessage(USER_META[USER_ID].name);
+            initUserWidget();
+            showWelcomeMessage(CURRENT_USER.name);
             loadKBStatus();
             loadDocuments();
             loadKBStandards();
@@ -1456,6 +1317,12 @@
             setupDragDrop();
             loadStandardsGrid();
             loadModelName();
+        });
+
+        // If the browser restores this page from its back-forward cache after a
+        // logout, reload so the server can send the user back to the login page.
+        window.addEventListener('pageshow', (event) => {
+            if (event.persisted) window.location.reload();
         });
 
         // ------------------------------------------------------------------
@@ -1568,74 +1435,26 @@
         // ------------------------------------------------------------------
         // User picker
         // ------------------------------------------------------------------
-        const USER_META = {
-            default:  { name: 'John Smith',    role: 'Default User', avatar: 'JS', color: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' },
-            analyst:  { name: 'Sarah Johnson', role: 'Analyst',      avatar: 'SJ', color: 'linear-gradient(135deg,#10b981,#059669)' },
-            auditor:  { name: 'Michael Chen',  role: 'Auditor',      avatar: 'MC', color: 'linear-gradient(135deg,#f59e0b,#d97706)' },
-            admin:    { name: 'Emily Davis',   role: 'Compliance Officer', avatar: 'ED', color: 'linear-gradient(135deg,#ef4444,#dc2626)' },
+        const CURRENT_USER = {
+            name: {{ user_name|tojson }},
+            role: {{ user_role|tojson }},
         };
 
-        function toggleUserDropdown() {
-            const wrapper = document.getElementById('userSelectWrapper');
-            const dropdown = document.getElementById('userDropdown');
-            const isOpen = dropdown.classList.contains('open');
-            if (isOpen) {
-                closeUserDropdown();
-            } else {
-                dropdown.classList.add('open');
-                wrapper.classList.add('open');
-            }
-        }
-
-        function closeUserDropdown() {
-            document.getElementById('userDropdown').classList.remove('open');
-            document.getElementById('userSelectWrapper').classList.remove('open');
-        }
-
-        function selectUser(value) {
-            if (USER_ID === value) { closeUserDropdown(); return; }
-            USER_ID = value;
-            const meta = USER_META[value] || { role: '', avatar: value.charAt(0).toUpperCase(), color: 'linear-gradient(135deg,#3b82f6,#8b5cf6)' };
-
-            // Update trigger widget
+        // Derive the avatar initials from the signed-in user's name
+        function initUserWidget() {
+            const initials = (CURRENT_USER.name || '?')
+                .split(/\s+/).filter(Boolean).slice(0, 2)
+                .map(w => w[0].toUpperCase()).join('') || '?';
             const avatar = document.getElementById('userAvatar');
-            avatar.textContent = meta.avatar;
-            avatar.style.background = meta.color;
-            document.getElementById('userDisplayName').textContent = meta.name || value;
-            document.getElementById('userDisplayRole').textContent = meta.role;
-
-            // Update active state in dropdown
-            document.querySelectorAll('.user-dropdown-item').forEach(item => {
-                item.classList.toggle('active', item.dataset.value === value);
-            });
-
-            closeUserDropdown();
-
-            // Clear per-user UI state and show personalised welcome
-            document.getElementById('chatMessages').innerHTML = '';
-            document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
-            showWelcomeMessage(meta.name || value);
-
-            // Reset standards checkboxes to defaults
-            document.querySelectorAll('#standardsGrid input[type="checkbox"]').forEach(cb => {
-                cb.checked = DEFAULT_CHECKED_STANDARDS.includes(cb.value);
-            });
-            enforceStandardsCap();
-
-            loadDocuments();
-            loadReports();
-            loadAuditLogs();
-            showToast(`Switched to ${meta.name}`, 'info');
+            if (avatar) avatar.textContent = initials;
         }
 
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            const wrapper = document.getElementById('userSelectWrapper');
-            const dropdown = document.getElementById('userDropdown');
-            if (wrapper && !wrapper.contains(e.target) && !dropdown.contains(e.target)) {
-                closeUserDropdown();
-            }
-        });
+        async function logout() {
+            try {
+                await fetch('/logout', { method: 'POST' });
+            } catch (e) { /* redirect regardless of the response */ }
+            window.location.href = '/login';
+        }
 
         // ------------------------------------------------------------------
         // KB Status & Standards
@@ -2103,7 +1922,7 @@
                 `<div class="no-docs-warning">⚠ <strong>No company documents uploaded.</strong> ${msg}</div>`
             );
 
-            // Code blocks (triple backtick) — protect first so inner content isn't mangled
+            // Code blocks (triple backtick): protect first so inner content isn't mangled
             const codeBlocks = [];
             html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (_, lang, code) => {
                 codeBlocks.push(`<pre><code>${code.trim()}</code></pre>`);
@@ -2124,7 +1943,7 @@
             // Blockquote
             html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
 
-            // Lists — collapse blank lines between list items before converting,
+            // Lists: collapse blank lines between list items before converting,
             // so \n\n between bullets doesn't produce stray <p> tags later.
             html = html.replace(/((?:^[\-\*] .+$\n?)(?:\n(?=[\-\*] ))?)+/gm, block => {
                 const items = block.split('\n')
@@ -2151,7 +1970,7 @@
                 return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
             });
 
-            // Risk-level colour badges (UI #7) — runs after tables so cells are covered
+            // Risk-level colour badges (UI #7), runs after tables so cells are covered
             const riskClass = lvl => 'risk-' + lvl.trim().toLowerCase();
             // Risk level shown as a standalone table cell
             html = html.replace(/<td>(Critical|High|Medium|Low)<\/td>/g,
@@ -2163,7 +1982,7 @@
             html = html.replace(/(Risk Level:?(?:<\/strong>)?:?\s*)(Critical|High|Medium|Low)\b/g,
                 (_, pre, lvl) => `${pre}<span class="risk-badge ${riskClass(lvl)}">${lvl}</span>`);
 
-            // Paragraphs — only split on double newlines that aren't already inside block elements
+            // Paragraphs: only split on double newlines that aren't already inside block elements
             html = html.replace(/\n\n+/g, '</p><p>');
             html = html.replace(/\n/g, '<br>');
             html = `<p>${html}</p>`;
@@ -2232,7 +2051,7 @@
                 });
                 document.getElementById('chatMessages').innerHTML = '';
                 document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
-                showWelcomeMessage(USER_META[USER_ID].name);
+                showWelcomeMessage(CURRENT_USER.name);
                 loadAuditLogs();
                 showToast('Session reset', 'info');
             } catch (e) { showToast('Failed to reset session', 'error'); }
