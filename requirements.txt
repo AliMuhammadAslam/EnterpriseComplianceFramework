@@ -3,6 +3,7 @@ python-dotenv
 pydantic
 requests
 flask
+werkzeug
 chromadb
 openai
 python-docx
