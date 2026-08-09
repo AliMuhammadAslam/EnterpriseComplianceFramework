@@ -18,7 +18,7 @@ class EvaluationEngine:
         self.model_config = {
             "model": f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}",
             "temperature": 0,
-            "max_tokens": int(os.getenv("MAX_TOKENS", "4000")),
+            "max_tokens": int(os.getenv("MAX_TOKENS", "6000")),
         }
         self.logger.info("EvaluationEngine initialized")
 

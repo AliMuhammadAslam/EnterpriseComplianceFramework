@@ -22,8 +22,8 @@ class Executor:
         self.logger = logger_instance.get_logger("executor")
         self.model_config = {
             "model": f"openai/{os.getenv('DEFAULT_MODEL', model_name)}",
-            "temperature": float(os.getenv("TEMPERATURE", "0.3")),
-            "max_tokens": int(os.getenv("MAX_TOKENS", "4000")),
+            "temperature": float(os.getenv("TEMPERATURE", "0.0")),
+            "max_tokens": int(os.getenv("MAX_TOKENS", "6000")),
         }
 
     def execute_plan(
