@@ -8,6 +8,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
+# Ablation runs index the same corpus under a second collection name, so this
+# is a parameter rather than a hardcoded string.
+KNOWLEDGE_COLLECTION = "regulatory_knowledge"
+
+
 class VectorStore:
     """ChromaDB wrapper with separate collections for the regulatory KB and per-user docs."""
 
@@ -34,9 +39,10 @@ class VectorStore:
         documents: List[str],
         metadatas: List[Dict[str, Any]],
         ids: List[str],
+        collection_name: str = KNOWLEDGE_COLLECTION,
     ):
-        """Add documents to the global regulatory knowledge base."""
-        collection = self._get_or_create_collection("regulatory_knowledge")
+        """Add documents to a regulatory knowledge collection."""
+        collection = self._get_or_create_collection(collection_name)
         embeddings = self.embedding_service.embed_batch(documents)
         collection.add(
             documents=documents,
@@ -45,15 +51,18 @@ class VectorStore:
             ids=ids,
         )
         self.logger.info(
-            f"Added {len(documents)} docs to regulatory_knowledge"
+            f"Added {len(documents)} docs to {collection_name}"
         )
 
     def query_knowledge(
-        self, query: str, top_k: int = 5
+        self,
+        query: str,
+        top_k: int = 5,
+        collection_name: str = KNOWLEDGE_COLLECTION,
     ) -> List[Dict[str, Any]]:
-        """Query the global regulatory knowledge base."""
+        """Query a regulatory knowledge collection."""
         try:
-            collection = self._get_or_create_collection("regulatory_knowledge")
+            collection = self._get_or_create_collection(collection_name)
             if collection.count() == 0:
                 return []
             query_embedding = self.embedding_service.embed_text(query)
@@ -64,14 +73,14 @@ class VectorStore:
             return self._format_results(results)
         except Exception as e:
             self.logger.warning(
-                f"ChromaDB query failed for regulatory_knowledge, "
+                f"ChromaDB query failed for {collection_name}, "
                 f"returning empty results: {e}"
             )
             return []
 
-    def knowledge_count(self) -> int:
-        """Return number of documents in the knowledge base."""
-        collection = self._get_or_create_collection("regulatory_knowledge")
+    def knowledge_count(self, collection_name: str = KNOWLEDGE_COLLECTION) -> int:
+        """Return number of documents in a regulatory knowledge collection."""
+        collection = self._get_or_create_collection(collection_name)
         return collection.count()
 
     def add_company_documents(

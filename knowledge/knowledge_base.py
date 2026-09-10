@@ -2,17 +2,29 @@ import os
 import glob
 from typing import List, Dict, Any
 from utils.logger import logger_instance
-from knowledge.vector_store import VectorStore
+from knowledge.vector_store import VectorStore, KNOWLEDGE_COLLECTION
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Section-aware splits on Markdown headings first, then by word count. Fixed
+# ignores headings and is the baseline it gets compared against.
+SECTION_AWARE = "section_aware"
+FIXED_SIZE = "fixed"
 
 
 class KnowledgeBase:
     """Loads and manages regulatory/compliance documents in the vector store."""
 
-    def __init__(self, vector_store: VectorStore = None):
+    def __init__(
+        self,
+        vector_store: VectorStore = None,
+        chunk_strategy: str = SECTION_AWARE,
+        collection_name: str = KNOWLEDGE_COLLECTION,
+    ):
         self.vector_store = vector_store or VectorStore()
+        self.chunk_strategy = chunk_strategy
+        self.collection_name = collection_name
         self.knowledge_path = os.getenv(
             "KNOWLEDGE_BASE_PATH", "./knowledge_data"
         )
@@ -28,8 +40,8 @@ class KnowledgeBase:
         )
 
     def is_populated(self) -> bool:
-        """Check if the knowledge base already has documents loaded."""
-        return self.vector_store.knowledge_count() > 0
+        """Check if this knowledge collection already has documents loaded."""
+        return self.vector_store.knowledge_count(self.collection_name) > 0
 
     def ingest(self, force: bool = False):
         """Read all .md and .txt files from knowledge_data and load them into the vector store."""
@@ -87,6 +99,7 @@ class KnowledgeBase:
                     documents=all_chunks[start:end],
                     metadatas=all_metadatas[start:end],
                     ids=all_ids[start:end],
+                    collection_name=self.collection_name,
                 )
 
             self.logger.info(
@@ -95,6 +108,36 @@ class KnowledgeBase:
             )
 
     def _chunk_document(
+        self, content: str, filename: str
+    ) -> List[Dict[str, Any]]:
+        """Split a document using the configured chunking strategy."""
+        if self.chunk_strategy == FIXED_SIZE:
+            return self._chunk_document_fixed(content, filename)
+        return self._chunk_document_section_aware(content, filename)
+
+    def _chunk_document_fixed(
+        self, content: str, filename: str
+    ) -> List[Dict[str, Any]]:
+        """Split purely by word count, ignoring headings.
+
+        Headings are not boundaries here, so a dense control list can be cut
+        in half mid-list.
+        """
+        chunks = []
+        for chunk_text in self._split_text(content, self.chunk_size, self.chunk_overlap):
+            if chunk_text.strip():
+                chunks.append({
+                    "text": chunk_text.strip(),
+                    "metadata": {
+                        "source": filename,
+                        "section": "",
+                        "type": "regulatory_knowledge",
+                        "chunk_strategy": FIXED_SIZE,
+                    },
+                })
+        return chunks
+
+    def _chunk_document_section_aware(
         self, content: str, filename: str
     ) -> List[Dict[str, Any]]:
         """Split document into chunks, preserving markdown section boundaries."""
@@ -131,6 +174,7 @@ class KnowledgeBase:
                             "source": filename,
                             "section": section_name,
                             "type": "regulatory_knowledge",
+                            "chunk_strategy": SECTION_AWARE,
                         },
                     })
 
@@ -192,7 +236,7 @@ class KnowledgeBase:
         """Return current status of the knowledge base."""
         return {
             "populated": self.is_populated(),
-            "document_count": self.vector_store.knowledge_count(),
+            "document_count": self.vector_store.knowledge_count(self.collection_name),
             "knowledge_path": self.knowledge_path,
             "standards_count": len(self.list_standards()),
         }
