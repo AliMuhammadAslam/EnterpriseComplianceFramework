@@ -100,21 +100,35 @@ graph TD
 ├── document_upload/
 │   ├── manager.py            # Full upload pipeline: validate, parse, chunk, embed, store
 │   ├── parser.py             # Text extraction for PDF, DOCX, and TXT files
-│   └── chunker.py            # Word-count-based chunking with configurable overlap
+│   ├── chunker.py            # Word-count-based chunking with configurable overlap
+│   └── validation.py         # File signature checks, safe filenames, size caps, instruction neutralisation
 │
 ├── evaluation/
-│   ├── engine.py             # RAG-powered compliance gap analysis engine
-│   └── report_store.py       # Persists and retrieves evaluation reports per user
+│   ├── engine.py              # RAG-powered compliance gap analysis engine
+│   ├── report_store.py        # Persists and retrieves evaluation reports per user
+│   ├── citation_validator.py  # Checks every cited identifier against the retrieved context
+│   ├── ablation_eval.py       # Component ablation benchmark (chunking, retrieval, planner)
+│   ├── benchmark_v2.py        # The 42-question benchmark set and scoring rubric
+│   ├── retrieval_eval.py      # Standalone retrieval quality measurement (recall@k, MRR)
+│   ├── risk_sensitivity.py    # Sensitivity analysis for the regulatory risk score
+│   ├── adversarial_eval.py    # Adversarial test: a fabricated regulation uploaded as policy
+│   ├── citation_audit.py      # Re-checks citation grounding on a completed benchmark run
+│   └── quantitative_eval.py   # Original baseline-vs-RAG benchmark runner
 │
 ├── audit/
-│   └── audit_logger.py       # Singleton audit trail logger (JSON Lines + CSV export)
+│   ├── audit_logger.py       # Hash-chained, tamper-evident audit trail logger
+│   └── evidence_trace.py     # Structured evidence trace per analysis (not a reasoning log)
 │
 ├── utils/
-│   └── logger.py             # Singleton logger (component-scoped)
+│   ├── logger.py             # Singleton logger (component-scoped)
+│   └── run_config.py         # Pinned model snapshot, seed, corpus hash, run manifest
 │
 ├── templates/
 │   ├── login.html            # Login page
 │   └── index.html            # Single-page web UI (chat + document upload + evaluation)
+│
+├── tests/                    # 101 tests covering audit chaining, citation validation,
+│                              # evidence traces, upload hardening, and tenant isolation
 │
 ├── web_app.py                # Flask web server, authentication, and REST API
 ├── main.py                   # CLI entry point (interactive and batch modes)
@@ -165,9 +179,10 @@ Conversation memory is scoped per user, so follow-up questions keep their contex
 - **Regulatory KB**: Eighteen authoritative compliance standards pre-loaded from `knowledge_data/` into a shared `regulatory_knowledge` ChromaDB collection on first startup.
 - **Company Documents**: User-uploaded documents are parsed, chunked, embedded, and stored in a per-user isolated collection (`company_docs_{user_id}`).
 - **Context injection**: RAG context is injected at three levels: the Planner prompt, each Executor LLM call, and the final result compilation, so responses stay citation-backed throughout.
+- **Citation validation**: the system prompt asks the model to cite only identifiers present in the retrieved context, and `citation_validator.py` checks this outside the model as well. Every regulatory identifier in a generated report is matched against the retrieved chunks, and unsupported ones are flagged rather than silently kept. This verifies that an identifier came from a retrieved chunk, not that the chunk itself is accurate.
 
 ### Audit Trail
-Every system action is recorded to `audit_logs/audit_log.jsonl` via the `AuditLogger` singleton. Tracked actions include:
+Every system action is recorded to `audit_logs/audit_log.jsonl` via the `AuditLogger` singleton. Entries are hash chained: each one carries the hash of the entry before it and a hash of its own contents, so editing or deleting an entry breaks every link after it. A verification routine reports where the chain failed. Appends are serialised by a lock, which tests confirm is load bearing, since removing it under a concurrent workload lost entries and broke the chain. This gives tamper evidence, not tamper prevention: anyone with filesystem access can still rebuild the chain from scratch. Tracked actions include:
 
 | Action | Description |
 |---|---|
@@ -232,6 +247,46 @@ An evaluation can target up to ten standards at a time, which keeps report gener
 
 ---
 
+## Reproducibility
+
+`utils/run_config.py` is the single place every LLM call resolves its model, seed, and temperature through, so a run can be reproduced or at least identified later. It pins a dated model snapshot rather than a moving alias like `gpt-4o`, which changes over time without notice. Each run records:
+
+- the model and embedding snapshot in use
+- the request seed and the returned system fingerprint, since OpenAI states that a fixed seed makes repeated requests more likely to match but does not guarantee it, and recommends watching the fingerprint for backend changes
+- a SHA-256 hash of the regulatory corpus, so a change to `knowledge_data/` is detectable
+- the installed package versions and the current git commit
+
+Temperature zero reduces sampling variability on its own but does not make a hosted model fully deterministic, which is why the seed and fingerprint are tracked as well.
+
+---
+
+## Research Evaluation Suite
+
+The `evaluation/` directory also holds the scripts used to produce the benchmark results reported in the accompanying paper. These are separate from the live application and cost API calls to run:
+
+| Script | What it measures |
+|---|---|
+| `benchmark_v2.py` | The 42-question benchmark: single-fact, multi-standard, and multi-step categories, with ground truth checked against the corpus and a fixed scoring rubric |
+| `ablation_eval.py` | Compares seven configurations (chunking strategy, retrieval strategy, with and without the planner) under a matched context budget, scored blind by two judge models |
+| `retrieval_eval.py` | Recall@k and mean reciprocal rank for retrieval on its own, without generation |
+| `citation_audit.py` | Re-checks every regulatory identifier in a completed run's answers against the context each answer actually received |
+| `risk_sensitivity.py` | Enumerates every combination the regulatory risk score can produce, to check whether the priority-band thresholds are stable |
+| `adversarial_eval.py` | Uploads a fabricated regulation as a company document and checks whether the system treats it as authoritative |
+
+Run any of them with `python -m evaluation.<script_name>`. Results are written to `evaluation/results/`, which is not tracked in this repository; the final results referenced in the paper are archived separately.
+
+---
+
+## Testing
+
+```bash
+python -m unittest discover -s tests
+```
+
+101 tests across six files, covering audit log hash chaining and tamper detection, citation validation, evidence trace redaction, upload hardening (including the directory traversal fix), and cross-tenant data isolation. The isolation and audit-lock tests were checked for sensitivity by deliberately injecting a fault and confirming the tests catch it, rather than assumed to be meaningful.
+
+---
+
 ## Prerequisites
 
 - Python 3.10+
@@ -279,8 +334,9 @@ SECRET_KEY=change-this-to-a-long-random-string
 USERS_FILE=./users.json
 
 # LLM Settings
-DEFAULT_MODEL=gpt-4o
-TEMPERATURE=0.7
+DEFAULT_MODEL=gpt-4o-2024-08-06
+SEED=42
+TEMPERATURE=0.0
 MAX_TOKENS=6000
 MAX_ITERATIONS=5
 
@@ -368,6 +424,8 @@ Ask any compliance-related question in the chat panel. The agent retrieves relev
 ### Document Upload
 Drag and drop, or click to browse, a company document (PDF, DOCX, or TXT, max 50 MB) into the upload panel. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
 
+Uploaded files are treated as untrusted input. The filename is reduced to a bare basename before it touches any path, which closes a directory traversal issue found during testing where a crafted filename could write outside the user's own upload folder. The file's contents are checked against its claimed extension, so a renamed executable is rejected rather than parsed. Page count, paragraph count, and extracted character count are capped before parsing. Text inside a document that addresses the model rather than the reader is marked and left in place, since silently deleting it would hide part of the document being assessed. These checks reduce the attack surface but do not eliminate prompt injection.
+
 ### Compliance Evaluation
 1. Select which uploaded documents to include using the checkboxes
 2. Select up to ten standards from the evaluation panel
@@ -433,9 +491,10 @@ All settings are controlled via environment variables with sensible defaults bui
 | `OPENAI_API_KEY` | required | OpenAI API key |
 | `SECRET_KEY` | `dev-secret-change-me` | Secret used to sign the session cookie |
 | `USERS_FILE` | `./users.json` | Path to the seeded user account store |
-| `DEFAULT_MODEL` | `gpt-4o` | LLM model name (any litellm-supported model) |
-| `TEMPERATURE` | `0.7` | LLM temperature for orchestration |
-| `MAX_TOKENS` | `4000` | Max tokens per LLM response (set higher for large evaluations) |
+| `DEFAULT_MODEL` | `gpt-4o-2024-08-06` | Dated model snapshot (any litellm-supported model; avoid moving aliases like `gpt-4o`) |
+| `SEED` | `42` | Request seed passed to every completion call |
+| `TEMPERATURE` | `0.0` | LLM temperature; 0 reduces sampling variability but does not guarantee determinism on its own |
+| `MAX_TOKENS` | `6000` | Max tokens per LLM response (set higher for large evaluations) |
 | `CHROMA_DB_PATH` | `./chroma_db` | ChromaDB persistence directory |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `CHUNK_SIZE` | `500` | Words per document chunk |

@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 from typing import Dict, Any
 from utils.logger import logger_instance
+from utils import run_config
 
 load_dotenv()
 
@@ -30,8 +31,8 @@ class Perception:
     def __init__(self):
         self.logger = logger_instance.get_logger("perception")
         self.model_config = {
-            "model": f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}",
-            "temperature": 0.1,
+            "model": run_config.litellm_model(),
+            "temperature": run_config.temperature(),
             "max_tokens": 20,
         }
 
@@ -74,6 +75,7 @@ class Perception:
                 ],
                 temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
+                seed=run_config.seed(),
             )
 
             intent = response.choices[0].message.content.strip().lower()

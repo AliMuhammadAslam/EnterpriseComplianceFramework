@@ -4,6 +4,7 @@ from litellm import completion
 from dotenv import load_dotenv
 from typing import Dict, Any, List
 from utils.logger import logger_instance
+from utils import run_config
 
 load_dotenv()
 
@@ -18,11 +19,11 @@ class ExecutionResult(BaseModel):
 class Executor:
     """Runs a Plan step by step, injecting RAG context into each LLM call."""
 
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = ""):
         self.logger = logger_instance.get_logger("executor")
         self.model_config = {
-            "model": f"openai/{os.getenv('DEFAULT_MODEL', model_name)}",
-            "temperature": float(os.getenv("TEMPERATURE", "0.0")),
+            "model": f"openai/{model_name}" if model_name else run_config.litellm_model(),
+            "temperature": run_config.temperature(),
             "max_tokens": int(os.getenv("MAX_TOKENS", "6000")),
         }
 
@@ -111,7 +112,7 @@ Cite specific standards, clauses, or articles where applicable.
 Use the provided reference material to give accurate, well-cited responses.
 {history_section}{rag_section}
 Provide clear, specific, and actionable results. Citation rules:
-- Use ONLY the control numbers, clause numbers, article numbers, and section identifiers that appear in the provided reference material above. Do not rely on your training knowledge for specific identifiers — standards are versioned and numbering changes between versions.
+- Use ONLY the control numbers, clause numbers, article numbers, and section identifiers that appear in the provided reference material above. Do not rely on your training knowledge for specific identifiers. Standards are versioned and numbering changes between versions.
 - Every requirement or control you mention must include its identifier exactly as it appears in the reference material (e.g. the clause number, article number, control ID, or section reference).
 - If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one."""
 
@@ -124,6 +125,7 @@ Provide clear, specific, and actionable results. Citation rules:
                 ],
                 temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
+                seed=run_config.seed(),
             )
             return response.choices[0].message.content.strip()
         except Exception as e:
@@ -164,7 +166,7 @@ Write a clear, comprehensive answer that directly addresses what the user asked.
 - Structure your response with clear sections where appropriate
 - Do not mention internal processing steps
 - If the context indicates that no company documents have been uploaded, explicitly tell the user that your response is based solely on the regulatory knowledge base and that uploading company documents will enable document-specific analysis
-- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned — do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly."""
+- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned, so do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly."""
 
         try:
             response = completion(
@@ -175,6 +177,7 @@ Write a clear, comprehensive answer that directly addresses what the user asked.
                 ],
                 temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
+                seed=run_config.seed(),
             )
             return response.choices[0].message.content.strip()
         except Exception as e:

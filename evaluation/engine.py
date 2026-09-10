@@ -1,8 +1,9 @@
 import os
 from typing import List
-from datetime import datetime
 from litellm import completion
 from utils.logger import logger_instance
+from utils import run_config
+from evaluation import citation_validator
 from knowledge.rag_pipeline import RAGPipeline
 from dotenv import load_dotenv
 
@@ -16,8 +17,8 @@ class EvaluationEngine:
         self.rag_pipeline = rag_pipeline or RAGPipeline()
         self.logger = logger_instance.get_logger("evaluation_engine")
         self.model_config = {
-            "model": f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}",
-            "temperature": 0,
+            "model": run_config.litellm_model(),
+            "temperature": run_config.temperature(),
             "max_tokens": int(os.getenv("MAX_TOKENS", "6000")),
         }
         self.logger.info("EvaluationEngine initialized")
@@ -88,6 +89,27 @@ class EvaluationEngine:
         )
         if verbose:
             print(f"[EVALUATION] Report generated ({len(report_text)} chars)")
+
+        # The prompt asks for retrieved identifiers only, but a prompt cannot
+        # guarantee it, so check each one against what was actually retrieved.
+        validation = citation_validator.validate(
+            report_text, f"{regulatory_context}\n\n{company_context}"
+        )
+        report_text += citation_validator.format_report(validation)
+
+        self.logger.info(
+            f"Citation validation: {validation.summary()}"
+        )
+        if verbose:
+            print(
+                f"[EVALUATION] Citation check: {len(validation.supported)}/"
+                f"{validation.total} identifiers supported"
+            )
+            if validation.unsupported:
+                print(
+                    f"[EVALUATION] Unsupported: "
+                    f"{', '.join(c.text for c in validation.unsupported)}"
+                )
 
         self.logger.info("Compliance evaluation completed")
         if verbose:
@@ -178,6 +200,8 @@ The score ranges from 1 to 45. Derive a priority band from the score:
 - Score 10 to 23: Medium-term action
 - Score 9 or below: Long-term action
 
+MANDATORY ESCALATION RULE: the multiplicative score alone can understate a severe obligation. A gap with Obligation Severity (S) of 5 scores only 5 when both Likelihood and Adequacy Gap are 1, which would place an AML/CFT or customer data obligation in the Long-term band. Therefore, any gap with S = 5 is never assigned below the Medium-term band, and any gap with S = 5 and G = 3 is always assigned the Immediate band, regardless of the computed score. Where escalation changes the band, report the computed score unchanged and add "escalated" in the Priority Band cell so the override is visible rather than hidden.
+
 Present this as a Markdown table with the columns: Gap | Standard | S | L | G | Risk Score | Priority Band, sorted by Risk Score from highest to lowest. Always show the actual S, L and G values you used so the calculation is fully traceable and reproducible.
 
 ## Recommendations
@@ -224,6 +248,7 @@ Produce a detailed, structured compliance evaluation report. In the Standards Co
                 ],
                 temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
+                seed=run_config.seed(),
             )
             return response.choices[0].message.content.strip()
         except Exception as e:

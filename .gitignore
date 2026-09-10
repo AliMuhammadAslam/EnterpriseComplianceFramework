@@ -10,7 +10,9 @@ venv/
 pytest_out.txt
 reports/
 audit_logs/
+evidence_traces/
 .pytest_cache/
 thesis_documentation.md
 evaluation/results/
 knowledge_data/.kb_hash
+REVISION_PLAN.md

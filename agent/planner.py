@@ -5,6 +5,7 @@ from litellm import completion
 from dotenv import load_dotenv
 from typing import List, Dict, Any, Optional
 from utils.logger import logger_instance
+from utils import run_config
 
 load_dotenv()
 
@@ -38,11 +39,11 @@ class Planner:
     regulation-aware, citation-backed plans for compliance queries.
     """
 
-    def __init__(self, model_name: str = "gpt-4o"):
+    def __init__(self, model_name: str = ""):
         self.logger = logger_instance.get_logger("planner")
         self.model_config = {
-            "model": f"openai/{os.getenv('DEFAULT_MODEL', model_name)}",
-            "temperature": float(os.getenv("TEMPERATURE", "0.0")),
+            "model": f"openai/{model_name}" if model_name else run_config.litellm_model(),
+            "temperature": run_config.temperature(),
             "max_tokens": int(os.getenv("MAX_TOKENS", "6000")),
         }
 
@@ -94,7 +95,7 @@ For compliance queries, the plan should include steps to:
 
         system_message = f"""You are a compliance-aware planning agent. Create a step-by-step plan to achieve the given goal.
 
-No tools are available — set tool_required to null for ALL steps.
+No tools are available. Set tool_required to null for ALL steps.
 {history_section}
 {rag_section}
 
@@ -126,6 +127,7 @@ Every step must use LLM reasoning only (tool_required: null)."""
                 ],
                 temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
+                seed=run_config.seed(),
             )
 
             raw_content = response.choices[0].message.content.strip()

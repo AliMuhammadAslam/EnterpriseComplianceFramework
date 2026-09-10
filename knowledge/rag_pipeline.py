@@ -1,7 +1,7 @@
 import os
 from typing import List, Dict, Any, Optional
 from utils.logger import logger_instance
-from knowledge.vector_store import VectorStore
+from knowledge.vector_store import VectorStore, KNOWLEDGE_COLLECTION
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -20,6 +20,17 @@ class RAGPipeline:
         self, query: str, user_id: Optional[str] = None
     ) -> str:
         """Query the regulatory KB and the user's company docs, return formatted context."""
+        context, _ = self.retrieve_context_with_results(query, user_id=user_id)
+        return context
+
+    def retrieve_context_with_results(
+        self, query: str, user_id: Optional[str] = None
+    ) -> tuple:
+        """Same as retrieve_context, but also returns the raw chunks.
+
+        Evidence traces need the individual chunks so each one can be hashed;
+        the formatted string flattens them together.
+        """
         self.logger.info(f"Retrieving context for query: {query[:80]}...")
 
         kb_results = self.vector_store.query_knowledge(query, top_k=self.top_k)
@@ -35,11 +46,24 @@ class RAGPipeline:
             f"Retrieved {len(kb_results)} KB chunks, "
             f"{len(company_results)} company doc chunks"
         )
-        return context
+        return context, kb_results + company_results
 
-    def retrieve_knowledge_only(self, query: str) -> str:
-        """Retrieve context only from the regulatory knowledge base."""
-        results = self.vector_store.query_knowledge(query, top_k=self.top_k)
+    def retrieve_knowledge_only(
+        self,
+        query: str,
+        collection_name: str = KNOWLEDGE_COLLECTION,
+        top_k: Optional[int] = None,
+    ) -> str:
+        """Retrieve context only from a regulatory knowledge collection.
+
+        collection_name and top_k are overridable so ablation runs can vary
+        them without touching the default path.
+        """
+        results = self.vector_store.query_knowledge(
+            query,
+            top_k=top_k or self.top_k,
+            collection_name=collection_name,
+        )
         return self._format_section("Regulatory Knowledge Base", results)
 
     def retrieve_company_docs_only(

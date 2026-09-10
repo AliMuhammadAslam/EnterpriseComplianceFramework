@@ -4,6 +4,7 @@ import os
 from dotenv import load_dotenv
 from agent.orchestrator import Orchestrator
 from utils.logger import logger_instance
+from utils import run_config
 
 load_dotenv()
 
@@ -108,8 +109,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-4o",
-        help="LLM model to use (default: gpt-4o)"
+        default="",
+        help="LLM model snapshot to use (default: the pinned snapshot in run_config)"
     )
     parser.add_argument(
         "--role",
@@ -136,14 +137,14 @@ def main():
     
     try:
         cli = AgentCLI()
-        if (args.model != "gpt-4o" or
+        if (args.model or
                 args.role != "You are a helpful AI assistant."):
             cli.orchestrator = Orchestrator(args.model, args.role)
         
         if args.verbose:
             print(f"Configuration:")
             print(f"   Mode: {args.mode}")
-            print(f"   Model: {args.model}")
+            print(f"   Model: {args.model or run_config.model_name()}")
             print(f"   Role: {args.role}")
             print()
         
