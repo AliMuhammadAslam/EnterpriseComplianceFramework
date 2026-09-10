@@ -8,6 +8,7 @@ from utils.logger import logger_instance
 from knowledge.vector_store import VectorStore
 from document_upload.parser import DocumentParser
 from document_upload.chunker import DocumentChunker
+from document_upload import validation
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -31,8 +32,10 @@ class UploadManager:
         self, file_path: str, original_filename: str, user_id: str
     ) -> Dict[str, Any]:
         """Validate, parse, chunk, embed, and store an uploaded document."""
-        # Check extension
-        ext = os.path.splitext(original_filename)[1].lower().lstrip(".")
+        # Strip any directory components before the name touches a path.
+        safe_name = validation.safe_filename(original_filename)
+
+        ext = os.path.splitext(safe_name)[1].lower().lstrip(".")
         if ext not in self.allowed_extensions:
             raise ValueError(
                 f"Unsupported file type: .{ext}. "
@@ -47,9 +50,13 @@ class UploadManager:
                 f"Max: {self.max_size_mb}MB"
             )
 
+        # The extension is a claim; check the bytes agree with it.
+        validation.verify_file_signature(file_path, ext)
+        validation.check_document_limits(file_path, ext)
+
         doc_id = str(uuid.uuid4())[:8]
         self.logger.info(
-            f"Processing upload: {original_filename} "
+            f"Processing upload: {safe_name} "
             f"(user: {user_id}, doc_id: {doc_id})"
         )
 
@@ -57,10 +64,19 @@ class UploadManager:
         if not text.strip():
             raise ValueError("Document appears to be empty or unreadable")
 
+        validation.check_extracted_size(text)
+
+        text, neutralised = validation.neutralise_instructions(text)
+        if neutralised:
+            self.logger.warning(
+                f"Neutralised {len(neutralised)} embedded instruction(s) "
+                f"in {safe_name} (user: {user_id})"
+            )
+
         chunks = self.chunker.chunk_text(
             text,
             metadata={
-                "source": original_filename,
+                "source": safe_name,
                 "doc_id": doc_id,
                 "user_id": user_id,
                 "type": "company_document",
@@ -82,14 +98,14 @@ class UploadManager:
         user_dir = os.path.join(self.upload_dir, user_id)
         os.makedirs(user_dir, exist_ok=True)
 
-        stored_filename = f"{doc_id}_{original_filename}"
+        stored_filename = f"{doc_id}_{safe_name}"
         stored_path = os.path.join(user_dir, stored_filename)
         if file_path != stored_path:
             shutil.copy2(file_path, stored_path)
 
         doc_record = {
             "doc_id": doc_id,
-            "original_filename": original_filename,
+            "original_filename": safe_name,
             "stored_filename": stored_filename,
             "uploaded_at": datetime.now().isoformat(),
             "file_size": file_size,
@@ -99,16 +115,17 @@ class UploadManager:
         self._update_manifest(user_id, doc_record)
 
         self.logger.info(
-            f"Upload complete: {original_filename} -> "
+            f"Upload complete: {safe_name} -> "
             f"{len(chunks)} chunks stored"
         )
 
         return {
             "success": True,
             "doc_id": doc_id,
-            "filename": original_filename,
+            "filename": safe_name,
             "chunks": len(chunks),
             "characters": len(text),
+            "neutralised_instructions": len(neutralised),
         }
 
     def list_documents(self, user_id: str) -> List[Dict[str, Any]]:

@@ -12,6 +12,20 @@ load_dotenv()
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from knowledge.rag_pipeline import RAGPipeline
+from utils import run_config
+
+
+# Backend fingerprints seen during a run. If this changes mid-run, identical
+# requests may stop producing identical output.
+_OBSERVED_FINGERPRINTS = set()
+
+
+def _track(response):
+    """Record the backend fingerprint from a response and pass it through."""
+    fingerprint = run_config.system_fingerprint(response)
+    if fingerprint:
+        _OBSERVED_FINGERPRINTS.add(fingerprint)
+    return response
 
 
 # Questions are deliberately chosen to require specific numerical values,
@@ -188,7 +202,7 @@ Hallucination Rate (1-5):
   4 = One minor unsupported claim, but no outright fabrication.
   3 = One or two clearly unsupported or potentially incorrect claims.
   2 = Several unsupported claims.
-  1 = Significant hallucination — multiple incorrect or fabricated regulatory facts.
+  1 = Significant hallucination: multiple incorrect or fabricated regulatory facts.
 
 Answer Relevance (1-5):
   5 = Directly and completely answers the question; all key points from the ground truth are present.
@@ -202,11 +216,11 @@ Respond ONLY with a JSON object in this exact format, no additional text:
 
 
 def get_model():
-    return f"openai/{os.getenv('DEFAULT_MODEL', 'gpt-4o')}"
+    return run_config.litellm_model()
 
 
 def call_baseline(question, model):
-    response = completion(
+    response = _track(completion(
         model=model,
         messages=[
             {
@@ -219,15 +233,16 @@ def call_baseline(question, model):
             },
             {"role": "user", "content": question},
         ],
-        temperature=0.0,
+        temperature=run_config.temperature(),
         max_tokens=600,
-    )
+        seed=run_config.seed(),
+    ))
     return response.choices[0].message.content.strip()
 
 
 def call_rag(question, rag, model):
     context = rag.retrieve_knowledge_only(question)
-    response = completion(
+    response = _track(completion(
         model=model,
         messages=[
             {
@@ -241,9 +256,10 @@ def call_rag(question, rag, model):
             },
             {"role": "user", "content": question},
         ],
-        temperature=0.0,
+        temperature=run_config.temperature(),
         max_tokens=600,
-    )
+        seed=run_config.seed(),
+    ))
     return response.choices[0].message.content.strip()
 
 
@@ -253,12 +269,13 @@ def judge_answer(question, ground_truth, answer, model):
         ground_truth=ground_truth,
         answer=answer,
     )
-    response = completion(
+    response = _track(completion(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.0,
+        temperature=run_config.temperature(),
         max_tokens=80,
-    )
+        seed=run_config.seed(),
+    ))
     raw = response.choices[0].message.content.strip()
     # strip markdown code fences if the model wraps the JSON
     if raw.startswith("```"):
@@ -276,11 +293,12 @@ def run_evaluation():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     csv_path = f"{results_dir}/results_{timestamp}.csv"
     md_path = f"{results_dir}/results_{timestamp}.md"
+    manifest_path = f"{results_dir}/manifest_{timestamp}.json"
 
     conditions = ["baseline", "rag"]
     rows = []
 
-    print(f"Running evaluation — {len(QUESTIONS)} questions x 2 conditions")
+    print(f"Running evaluation, {len(QUESTIONS)} questions x 2 conditions")
     print(f"Model: {model}\n")
 
     for i, q in enumerate(QUESTIONS, 1):
@@ -323,7 +341,7 @@ def run_evaluation():
                 )
 
             except Exception as e:
-                print(f"ERROR — {e}")
+                print(f"ERROR: {e}")
                 for metric in ["citation", "hallucination", "relevance", "mean"]:
                     row[f"{condition}_{metric}"] = None
                 row[f"{condition}_answer"] = f"ERROR: {e}"
@@ -336,9 +354,17 @@ def run_evaluation():
     _write_csv(rows, csv_path)
     _write_markdown(rows, md_path)
 
+    manifest = run_config.run_manifest()
+    manifest["observed_system_fingerprints"] = sorted(_OBSERVED_FINGERPRINTS)
+    manifest["questions"] = len(QUESTIONS)
+    manifest["conditions"] = conditions
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest, f, indent=2)
+
     print(f"Results saved:")
     print(f"  CSV:      {csv_path}")
-    print(f"  Markdown: {md_path}\n")
+    print(f"  Markdown: {md_path}")
+    print(f"  Manifest: {manifest_path}\n")
 
     _print_summary(rows)
 
@@ -384,7 +410,7 @@ def _write_markdown(rows, path):
         "",
         "---",
         "",
-        "## Summary — Average Scores",
+        "## Summary: Average Scores",
         "",
         "| Metric | Baseline (No RAG) | RAG-Enhanced |",
         "|--------|-------------------|--------------|",
@@ -400,7 +426,7 @@ def _write_markdown(rows, path):
     lines += ["", "---", "", "## Per-Question Breakdown", ""]
 
     for row in rows:
-        lines.append(f"### {row['id']} — {row['standard']}")
+        lines.append(f"### {row['id']}: {row['standard']}")
         lines.append(f"**Question**: {row['question']}")
         lines.append("")
         lines.append(
