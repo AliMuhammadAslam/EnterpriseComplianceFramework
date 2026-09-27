@@ -1,0 +1,216 @@
+{
+  "recorded_at_utc": "2026-09-26T18:18:54.625570+00:00",
+  "model": "gpt-4o-2024-08-06",
+  "embedding_model": "text-embedding-3-small",
+  "seed": 42,
+  "temperature": 0.0,
+  "max_tokens": 6000,
+  "rag_top_k": 5,
+  "corpus_sha256": "1d542ffa52335b74ea4dc53cfcc61b986bc19ba88debd94d69bb22b1351a8b85",
+  "corpus_files": [
+    {
+      "file": "basel_framework.md",
+      "bytes": 5155,
+      "sha256": "670b69e731e8a63e632afc23e74932d97634ed19d46579a04edd35e8d91fffa9"
+    },
+    {
+      "file": "cobit.md",
+      "bytes": 4267,
+      "sha256": "304a62fb62ebb0104f8bb3303529aa268da3522b456ed3e3374bb2147c58ae19"
+    },
+    {
+      "file": "csa_ccm.md",
+      "bytes": 6737,
+      "sha256": "c265d2eeb4d0f8c63723398a0a534a4666b14b3d5c6f9c19ddd08c22703d3b5c"
+    },
+    {
+      "file": "fatf_guidelines.md",
+      "bytes": 5468,
+      "sha256": "2c3435ab25051e715ee5a6724b02d94455beb345dfb344dc3f3aef84ad6d2f70"
+    },
+    {
+      "file": "gdpr.md",
+      "bytes": 3954,
+      "sha256": "eed83042908abb3cffefca484d5433fa1976f571189fcfaa74e02a3600561a2a"
+    },
+    {
+      "file": "hipaa.md",
+      "bytes": 3841,
+      "sha256": "c1184dab3e58ade7728895b0dc0a201a864a3e6f5dc654af4fc8f1add6625845"
+    },
+    {
+      "file": "iso_22301.md",
+      "bytes": 4934,
+      "sha256": "a58230923428dcd297df1fab63d38a7cd94eb5aa0593093e56a93d84edef4599"
+    },
+    {
+      "file": "iso_27001.md",
+      "bytes": 6992,
+      "sha256": "a97b50466cacb1fae90354c153d94366ed611419d63a61529b5cbd9daa1cc66a"
+    },
+    {
+      "file": "iso_31000.md",
+      "bytes": 5716,
+      "sha256": "774a86ddec055c73cd3a3523529a123b4b4e4feae80735c25836a0641ddc925f"
+    },
+    {
+      "file": "nist_csf.md",
+      "bytes": 3558,
+      "sha256": "bb580064172a629d40a04d14743c01214570a962c2d2e1394590027b30b28d95"
+    },
+    {
+      "file": "pakistan_aml_cft.md",
+      "bytes": 5372,
+      "sha256": "81527111ad20ae4062d9caf27c35d61c841a439fc4c25360f604b8f54ba37e71"
+    },
+    {
+      "file": "pci_dss.md",
+      "bytes": 3801,
+      "sha256": "d6d455023a956a244bd626b6aa706ed6f2580a53db67e0dde51e0f04f225c3e8"
+    },
+    {
+      "file": "peca_2016.md",
+      "bytes": 5312,
+      "sha256": "aa83cf0c2c09b0ecf66ffcd1c4fc4b27d20cd2f570e52411876eafc1b76849d5"
+    },
+    {
+      "file": "psd2_open_banking.md",
+      "bytes": 5247,
+      "sha256": "c003acbf9bf734915db9901d656cdb370c0eddac5d99584537ef50595e915eb2"
+    },
+    {
+      "file": "sbp_regulations.md",
+      "bytes": 9230,
+      "sha256": "a8ceb0f1e582060a4b09de16ef902aaab1afd18d28f27e94e69ee5797cee0df2"
+    },
+    {
+      "file": "secp_guidelines.md",
+      "bytes": 4069,
+      "sha256": "279e6ebbc52aedf99a8f3a39e0eb444b7299d1028890776244f195762b13e361"
+    },
+    {
+      "file": "soc2.md",
+      "bytes": 2728,
+      "sha256": "0a3db6b7d38a42efea2a24ab5bc0026da305de3702777bf2141368565321b513"
+    },
+    {
+      "file": "swift_csp.md",
+      "bytes": 5594,
+      "sha256": "c972eb36d6b317671b71eee35925c110abfac80d5192bb5892f2aacd1ee9e8d8"
+    }
+  ],
+  "git_commit": "a0e7ab2788b20b5df5f4aec76fe7c81d9bed7bfd",
+  "packages": {
+    "litellm": "1.89.0",
+    "openai": "2.41.1",
+    "chromadb": "1.5.9",
+    "pydantic": "2.13.4",
+    "tiktoken": "0.13.0"
+  },
+  "python": "3.10.4",
+  "platform": "Windows-10-10.0.26200-SP0",
+  "observed_system_fingerprints": [
+    "fp_087f6ae320",
+    "fp_10a9fd5a82",
+    "fp_24e955c341",
+    "fp_2a9610bf9f",
+    "fp_359379690f",
+    "fp_38255cd5f6",
+    "fp_40aced2ba4",
+    "fp_43c2d22e2b",
+    "fp_6359026e51",
+    "fp_67bbf2f77c",
+    "fp_6a65994342",
+    "fp_7fd239739d",
+    "fp_894e7baa82",
+    "fp_8dbe57060b",
+    "fp_b8176c105e",
+    "fp_bae4e8e4a7",
+    "fp_ef04e12e2a",
+    "fp_f1fdc30c4a"
+  ],
+  "judge_model": "openai/gpt-4o-2024-08-06",
+  "conditions": {
+    "no_retrieval": {
+      "retrieval": "none",
+      "collection": null,
+      "planner": false
+    },
+    "fixed_rag": {
+      "retrieval": "combined",
+      "collection": "regulatory_knowledge_fixed",
+      "planner": false,
+      "top_k": 5
+    },
+    "section_aware_rag": {
+      "retrieval": "combined",
+      "collection": "regulatory_knowledge",
+      "planner": false,
+      "top_k": 16
+    },
+    "standard_specific_fixed": {
+      "retrieval": "per_standard",
+      "collection": "regulatory_knowledge_fixed",
+      "planner": false,
+      "top_k": 3
+    },
+    "standard_specific_section_aware": {
+      "retrieval": "per_standard",
+      "collection": "regulatory_knowledge",
+      "planner": false,
+      "top_k": 10
+    },
+    "ecf_original": {
+      "retrieval": "per_standard",
+      "collection": "regulatory_knowledge",
+      "planner": true,
+      "top_k": 10
+    },
+    "ecf_tuned": {
+      "retrieval": "per_standard",
+      "collection": "regulatory_knowledge_fixed",
+      "planner": true,
+      "top_k": 3
+    }
+  },
+  "questions": 7,
+  "question_ids": [
+    "MS-05",
+    "MS-07",
+    "MST-04",
+    "SF-04",
+    "SF-06",
+    "MS-13",
+    "MS-19"
+  ],
+  "answer_max_tokens": 600,
+  "second_judge": "openai/gpt-4o-mini",
+  "judge_blind": "The judge receives only question, reference answer and answer text. Condition labels are never passed to it.",
+  "judge_agreement": {
+    "n": 49,
+    "citation_accuracy": {
+      "exact": 0.551,
+      "within_one": 0.755,
+      "judge1_mean": 3.49,
+      "judge2_mean": 4.347
+    },
+    "hallucination_rate": {
+      "exact": 0.633,
+      "within_one": 0.898,
+      "judge1_mean": 4.041,
+      "judge2_mean": 4.51
+    },
+    "answer_relevance": {
+      "exact": 0.612,
+      "within_one": 1.0,
+      "judge1_mean": 4.306,
+      "judge2_mean": 4.653
+    },
+    "overall": {
+      "judge1_mean": 3.946,
+      "judge2_mean": 4.503,
+      "mean_absolute_difference": 0.599,
+      "correlation": 0.75
+    }
+  }
+}

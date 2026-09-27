@@ -3,16 +3,20 @@
 Box 15 asks for hallucination reported as the share of claims with no support,
 not as a 1 to 5 rating. The judge produces a rating; this produces the share.
 
-Answers from a completed run are re-checked with the citation validator. The
-context each answer saw is rebuilt rather than stored, which is safe because
-retrieval is deterministic for a fixed corpus and query. Embedding calls only,
-no completions.
+Answers from a completed run are re-checked with the citation validator against
+the context that answer actually saw, read from the exported contexts for the
+run. Rebuilding the context instead would re-retrieve from whatever the corpus
+holds today, so any later correction to a source document would silently change
+the reported figures for a run that never used it. The export is the record of
+what was retrieved at the time. Rebuilding remains as a fallback for runs with
+no export, and costs embedding calls only, no completions.
 
 Run with:  python -m evaluation.citation_audit [path_to_ablation_csv]
 """
 
 import csv
 import glob
+import json
 import os
 import statistics
 import sys
@@ -25,18 +29,57 @@ from evaluation.ablation_eval import CONDITIONS, build_context
 from knowledge.rag_pipeline import RAGPipeline
 
 
-def latest_csv():
+# The run the thesis reports. Other runs must be named on the command line.
+REPORTED_RUN = "ablation_20260903_014438"
+
+
+def default_csv():
+    """The development run, which is the one the reported tables come from.
+
+    Picking the newest file instead would silently switch to the reserved-question
+    run, whose seven questions do not reproduce the reported tables. Pass a path
+    explicitly to audit any other run.
+    """
     matches = sorted(glob.glob("evaluation/results/ablation_2026*.csv"))
     if not matches:
         print("No ablation results found. Run the ablation first.")
         sys.exit(1)
-    return matches[-1]
+    preferred = [m for m in matches if REPORTED_RUN in m]
+    chosen = preferred[0] if preferred else matches[0]
+    others = [m for m in matches if m != chosen]
+    if others:
+        print("Using the reported development run. Other runs present: %s"
+              % ", ".join(os.path.basename(o) for o in others))
+    return chosen
+
+
+def stored_contexts(csv_path):
+    """Map (question_id, condition) to the context recorded for that run.
+
+    Returns an empty map when no export sits alongside the run, in which case
+    the caller falls back to rebuilding.
+    """
+    exports = sorted(glob.glob("evaluation/results/retrieved_contexts_*.jsonl"))
+    if not exports:
+        return {}
+
+    contexts = {}
+    for line in open(exports[-1], encoding="utf-8"):
+        record = json.loads(line)
+        contexts[(record["question_id"], record["condition"])] = record.get(
+            "retrieved_context", ""
+        )
+    if contexts:
+        print(f"Using recorded contexts from {os.path.basename(exports[-1])}")
+    return contexts
 
 
 def audit(path):
     rows = list(csv.DictReader(open(path, encoding="utf-8")))
     rows = [r for r in rows if r.get("answer") and not r["answer"].startswith("ERROR")]
-    rag = RAGPipeline()
+    recorded = stored_contexts(path)
+    rag = None
+    rebuilt = 0
 
     # Contexts are identical across conditions for a given question, so cache.
     cache = {}
@@ -45,11 +88,17 @@ def audit(path):
     for i, row in enumerate(rows, 1):
         condition = row["condition"]
         key = (row["question_id"], condition)
-        if key not in cache:
-            cache[key] = build_context(
-                row["question"], row["standard"], condition, rag
-            )
-        context = cache[key]
+        if key in recorded:
+            context = recorded[key]
+        else:
+            if key not in cache:
+                if rag is None:
+                    rag = RAGPipeline()
+                cache[key] = build_context(
+                    row["question"], row["standard"], condition, rag
+                )
+                rebuilt += 1
+            context = cache[key]
 
         report = citation_validator.validate(row["answer"], context)
         results.append({
@@ -96,7 +145,7 @@ def summarise(results, conditions):
 
 
 def main():
-    path = sys.argv[1] if len(sys.argv) > 1 else latest_csv()
+    path = sys.argv[1] if len(sys.argv) > 1 else default_csv()
     print(f"Auditing {path}\n")
 
     results = audit(path)

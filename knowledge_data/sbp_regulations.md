@@ -25,16 +25,30 @@ Applies to all entities providing financial services in Pakistan, including comm
 - Safeguarding of customer funds in scheduled banks
 - Customer funds cannot be commingled with EMI operational funds
 - Real-time transaction monitoring and reconciliation
-- Maximum e-wallet limit: PKR 500,000 (Level 2 verified accounts)
-- Transaction limits as per account tier (Level 0, Level 1, Level 2)
+- Enhanced E-Money Wallet: balance up to PKR 1,000,000 for individual customers, subject to
+  proof of income or source of funds, CNIC and SIM pairing, transaction monitoring and customer
+  risk profiling (Regulations for EMIs, 2023, para 14(III))
+- The higher limit requires a commercial operation licence and prior application to PSP and OD
 
-## Branchless Banking Regulations (2008, amended 2016)
+## Branchless Banking Regulations (BPRD Circular No. 10 of 2019)
 
 ### Account Tiers
-- **Level 0 (L0)**: Monthly transaction limit PKR 25,000; balance limit PKR 15,000; opened with CNIC only
-- **Level 1 (L1)**: Monthly limit PKR 80,000; balance PKR 400,000; biometric verification required
-- **Level 2 (L2)**: No monthly limit; balance PKR 500,000; full KYC with source of income
-- **Level 3 (L3)**: No limits; full bank account equivalent
+Level-specific limits below are those of BPRD Circular No. 10 of 2019, dated 30 December 2019.
+
+- **Level 0 (L0)**: Daily limit PKR 25,000; monthly limit PKR 50,000; yearly limit PKR 200,000;
+  maximum balance PKR 200,000; opened with CNIC only
+- **Level 1 (L1)**: Daily limit PKR 50,000; monthly limit PKR 200,000; no annual limit and no
+  maximum balance prescribed; biometric verification required
+- **Level 2 (L2)**: No SBP numerical limits. The financial institution sets limits from the
+  customer risk profile and its own monitoring capacity; full KYC with source of income
+- Level 3 is not a current customer account level. It existed in the earlier framework and is
+  absent from the structure set by the 2019 revision, which uses Levels 0, 1 and 2
+
+Customer onboarding provisions of the 2019 regulations were superseded by the Consolidated
+Customer Onboarding Framework introduced by BPRD Circular No. 01 of 2025, dated 25 July 2025 and
+amended 24 March 2026. Its Annex-D sets a generic Branchless Banking Account at PKR 100,000 per
+day, PKR 300,000 per month and a maximum credit balance of PKR 1,000,000, with no annual limit
+stated. The Level 0, 1 and 2 classifications remain in use for SBP reporting.
 
 ### Agent Network Requirements
 - Agents must be registered and trained by the financial institution
@@ -116,7 +130,10 @@ Applies to all entities providing financial services in Pakistan, including comm
 - **Purpose limitation**: Customer data may only be used for the purpose for which consent was obtained. Secondary use (e.g., marketing analytics) requires separate consent.
 - **Data retention limits**: Customer data must not be retained beyond the period necessary for business and regulatory purposes. The minimum retention period for AML/CFT records is 5 years after the end of the business relationship; payment records must be retained for at least 5 years.
 - **Right to access and rectification**: Customers have the right to access their personal data held by regulated entities and to request correction of inaccurate records.
-- **Data breach notification**: Entities must notify SBP within 72 hours of discovering a personal data breach that may affect customer interests or regulatory compliance.
+- **Data breach notification**: SBP does not set a 72-hour deadline. Under the Regulations for
+  EMIs, 2023, section 21, all security breaches must be reported immediately, with a detailed
+  report submitted within 15 days. For banks and microfinance banks, BPRD Circular No. 05 of 2017
+  requires incidents involving compromised customer data to be reported to BPRD within 48 hours.
 
 ## SBP Risk Management Guidelines
 

@@ -593,6 +593,12 @@ def main():
         help="Include the reserved holdout questions. Only for a final run.",
     )
     parser.add_argument(
+        "--only-holdout",
+        action="store_true",
+        help="Run the holdout questions on their own, leaving the development "
+             "scores from an earlier run untouched.",
+    )
+    parser.add_argument(
         "--limit",
         type=int,
         default=0,
@@ -626,7 +632,11 @@ def main():
     if args.question_set == "v2":
         from evaluation.benchmark_v2 import all_questions
 
-        questions = all_questions(include_holdout=args.include_holdout)
+        questions = all_questions(
+            include_holdout=args.include_holdout or args.only_holdout
+        )
+        if args.only_holdout:
+            questions = [q for q in questions if q.get("split") == "holdout"]
     else:
         questions = QUESTIONS
 

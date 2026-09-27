@@ -56,9 +56,11 @@ QUESTIONS_V2 = [
         "question": "A Pakistani fintech serving EU customers suffers a personal data "
                     "breach. What are its notification deadlines under SBP rules, under "
                     "GDPR, and under PECA 2016?",
-        "ground_truth": "SBP requires notification to SBP within 72 hours of discovering a "
-                        "personal data breach that may affect customer interests or "
-                        "regulatory compliance. GDPR requires notification to the "
+        "ground_truth": "SBP sets no 72-hour deadline. Under the Regulations for EMIs, 2023, "
+                        "section 21, security breaches must be reported immediately with a "
+                        "detailed report within 15 days, and BPRD Circular No. 05 of 2017 "
+                        "requires banks and microfinance banks to report compromised customer "
+                        "data to BPRD within 48 hours. GDPR requires notification to the "
                         "supervisory authority within 72 hours of becoming aware, and "
                         "notification to affected individuals if the breach poses a high "
                         "risk to their rights. PECA 2016 does not mandate specific data "
@@ -118,7 +120,7 @@ QUESTIONS_V2 = [
         "standard": "PECA 2016, GDPR",
         "question": "Compare the maximum monetary penalty for electronic fraud under PECA "
                     "2016 with the maximum penalty under the more severe GDPR tier.",
-        "ground_truth": "PECA 2016 Section 13, electronic fraud, carries imprisonment up to "
+        "ground_truth": "PECA 2016 Section 14, electronic fraud, carries imprisonment up to "
                         "2 years or a fine up to PKR 10 million, or both. GDPR Tier 2 "
                         "penalties reach up to EUR 20 million or 4 percent of global annual "
                         "turnover, whichever is higher. The GDPR maximum is substantially "
@@ -173,14 +175,16 @@ QUESTIONS_V2 = [
         "split": "dev",
         "standard": "SBP Branchless Banking Regulations",
         "question": "A customer holds a Level 1 branchless banking account and wants to "
-                    "maintain a balance of PKR 450,000. Is this permitted? If not, what tier "
-                    "is required and what verification does it demand?",
-        "ground_truth": "Not permitted. A Level 1 account has a balance limit of PKR 400,000 "
-                        "and a monthly transaction limit of PKR 80,000, and requires biometric "
-                        "verification. PKR 450,000 exceeds that limit, so the customer must "
-                        "upgrade to Level 2, which has a balance limit of PKR 500,000, no "
-                        "monthly transaction limit, and requires full KYC with source of "
-                        "income documentation.",
+                    "maintain a balance of PKR 450,000 and transact PKR 250,000 in a month. "
+                    "Which of these is permitted, and what would the customer need to do?",
+        "ground_truth": "The balance is permitted and the monthly transaction volume is not. "
+                        "Under BPRD Circular No. 10 of 2019 a Level 1 account has no prescribed "
+                        "maximum balance, so PKR 450,000 is allowed, but the monthly limit is "
+                        "PKR 200,000 and the daily limit PKR 50,000, so PKR 250,000 in a month "
+                        "exceeds it. To transact beyond those limits the customer must move to "
+                        "Level 2, where the financial institution sets limits from the customer "
+                        "risk profile rather than a fixed SBP figure, and which requires full "
+                        "KYC with source of income documentation.",
     },
     {
         "id": "MST-02",
@@ -226,8 +230,9 @@ QUESTIONS_V2 = [
         "ground_truth": "Under GDPR, notify the supervisory authority within 72 hours of "
                         "becoming aware, and notify affected individuals directly if the "
                         "breach poses a high risk to their rights. Under SBP rules, notify SBP "
-                        "within 72 hours of discovering a personal data breach that may affect "
-                        "customer interests or regulatory compliance. PECA 2016 sets no "
+                        "immediately, with a detailed report within 15 days under the Regulations "
+                        "for EMIs, 2023, section 21, or within 48 hours for banks and "
+                        "microfinance banks under BPRD Circular No. 05 of 2017. PECA 2016 sets no "
                         "specific notification deadline, but the FIA Cybercrime Wing is the "
                         "investigation and enforcement body and incident response plans should "
                         "include FIA reporting procedures.",
@@ -242,11 +247,10 @@ QUESTIONS_V2 = [
                     "for each?",
         "ground_truth": "Section 4, unauthorised copying or transmission of data, carries "
                         "imprisonment up to 6 months or a fine up to PKR 100,000, or both. "
-                        "Section 26, violation of the right to privacy through unauthorised "
-                        "disclosure of personal data, carries imprisonment up to 3 years or a "
-                        "fine up to PKR 1 million, or both. If identity information is "
-                        "subsequently misused, Section 16 identity theft carries imprisonment "
-                        "up to 3 years or a fine up to PKR 5 million, or both.",
+                        "PECA 2016 creates no general right-to-privacy offence, so the disclosure "
+                        "itself is reached only where identity information is involved: "
+                        "Section 16, unauthorised use of identity information, carries "
+                        "imprisonment up to 3 years or a fine up to PKR 5 million, or both.",
     },
     {
         "id": "MST-06",
@@ -273,8 +277,9 @@ QUESTIONS_V2 = [
         "question": "For a Level 0 branchless banking account, what is the monthly "
                     "transaction limit, the balance limit, and the documentation needed to "
                     "open it?",
-        "ground_truth": "Monthly transaction limit of PKR 25,000, balance limit of PKR 15,000, "
-                        "and the account is opened with CNIC only.",
+        "ground_truth": "Monthly transaction limit of PKR 50,000, maximum balance of PKR 200,000, "
+                        "and the account is opened with CNIC only. The daily limit is PKR 25,000 "
+                        "and the yearly limit PKR 200,000.",
     },
     {
         "id": "SF-02",
@@ -331,8 +336,9 @@ QUESTIONS_V2 = [
         "standard": "PECA 2016",
         "question": "Under PECA 2016, for how long may a service provider be required to "
                     "preserve specified data on government request, and under which section?",
-        "ground_truth": "Up to 90 days, under Section 29. Section 30 separately provides for "
-                        "production orders for data and records.",
+        "ground_truth": "Up to 90 days, under Section 31, expedited preservation and "
+                        "acquisition of data. Section 32 separately requires service providers "
+                        "to retain traffic data for at least one year.",
     },
 
     {

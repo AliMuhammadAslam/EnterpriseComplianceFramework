@@ -92,8 +92,12 @@ class EvaluationEngine:
 
         # The prompt asks for retrieved identifiers only, but a prompt cannot
         # guarantee it, so check each one against what was actually retrieved.
+        # Pass the two contexts separately: an uploaded policy must not be able
+        # to satisfy a regulatory citation.
         validation = citation_validator.validate(
-            report_text, f"{regulatory_context}\n\n{company_context}"
+            report_text,
+            regulatory_context=regulatory_context,
+            company_context=company_context,
         )
         report_text += citation_validator.format_report(validation)
 

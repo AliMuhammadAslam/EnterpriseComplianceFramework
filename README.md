@@ -145,16 +145,27 @@ The web application is protected by a session-based login. Accounts are fixed (t
 
 Passwords are hashed with `werkzeug.security` and stored in `users.json`, which is created and seeded automatically on first run.
 
-### Default accounts
+### Accounts
 
-| Username | Password | Name | Role |
-|---|---|---|---|
-| `john` | `john123` | John Smith | Default User |
-| `sarah` | `sarah123` | Sarah Johnson | Analyst |
-| `michael` | `michael123` | Michael Chen | Auditor |
-| `emily` | `emily123` | Emily Davis | Compliance Officer |
+| Username | Name | Role |
+|---|---|---|
+| `john` | John Smith | Default User |
+| `sarah` | Sarah Johnson | Analyst |
+| `michael` | Michael Chen | Auditor |
+| `emily` | Emily Davis | Compliance Officer |
 
-These are demo credentials. To change a password or add an account, edit `auth/user_store.py` and delete `users.json` so it reseeds on the next start. Each account maps to its own data namespace, so uploaded documents and reports stay isolated per user.
+Passwords are **not** set in the source. On first run each account is given a random password, printed once to the console:
+
+```
+==============================================================
+First run: account passwords generated. Record them now.
+They are not stored in plain text and will not be shown again.
+==============================================================
+  john       <generated>
+  ...
+```
+
+Record them at that point. Only the hash is written to `users.json`, so a lost password cannot be recovered; delete `users.json` and restart to issue a new set. To add an account, add an entry to `DEFAULT_ACCOUNTS` in `auth/user_store.py` and reseed. Each account maps to its own data namespace, so uploaded documents and reports stay isolated per user.
 
 > The command-line interface (`main.py`) is a local developer tool and does not use the login layer.
 
@@ -273,7 +284,11 @@ The `evaluation/` directory also holds the scripts used to produce the benchmark
 | `risk_sensitivity.py` | Enumerates every combination the regulatory risk score can produce, to check whether the priority-band thresholds are stable |
 | `adversarial_eval.py` | Uploads a fabricated regulation as a company document and checks whether the system treats it as authoritative |
 
-Run any of them with `python -m evaluation.<script_name>`. Results are written to `evaluation/results/`, which is not tracked in this repository; the final results referenced in the paper are archived separately.
+Run any of them with `python -m evaluation.<script_name>`. Results are written to `evaluation/results/`, which **is** tracked in this repository, so the per-question scores, run manifests and retrieved contexts behind every reported figure are held alongside the code rather than archived elsewhere.
+
+`analysis.py` regenerates the reported performance and paired-difference tables from the stored per-question scores. `citation_audit.py` re-checks each cited identifier against the context that answer actually received, read from the exported contexts for the run rather than re-retrieved, so a later correction to a source document cannot silently change the figures reported for a run that never used it.
+
+Both default to the development run that the reported tables come from and name any other runs present. Pass a results path explicitly to audit a different run. Each run manifest records the corpus hash and git commit in force at the time, so the provenance of a figure stays readable even after the corpus or the code moves on.
 
 ---
 
@@ -379,7 +394,7 @@ LOG_LEVEL=INFO
 python web_app.py
 ```
 
-Open [http://localhost:5000](http://localhost:5000) in your browser. You will be redirected to the login page. Sign in with one of the default accounts, for example `john` / `john123`. To switch users, sign out and sign back in as another account.
+Open [http://localhost:5000](http://localhost:5000) in your browser. You will be redirected to the login page. Sign in as one of the accounts listed under Authentication, using the password printed to the console on first run. To switch users, sign out and sign back in as another account.
 
 ### CLI, Interactive Mode
 
@@ -489,7 +504,7 @@ All settings are controlled via environment variables with sensible defaults bui
 | Variable | Default | Description |
 |---|---|---|
 | `OPENAI_API_KEY` | required | OpenAI API key |
-| `SECRET_KEY` | `dev-secret-change-me` | Secret used to sign the session cookie |
+| `SECRET_KEY` | required | Secret used to sign the session cookie. The app refuses to start without it; there is no fallback value |
 | `USERS_FILE` | `./users.json` | Path to the seeded user account store |
 | `DEFAULT_MODEL` | `gpt-4o-2024-08-06` | Dated model snapshot (any litellm-supported model; avoid moving aliases like `gpt-4o`) |
 | `SEED` | `42` | Request seed passed to every completion call |

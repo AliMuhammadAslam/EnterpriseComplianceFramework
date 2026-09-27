@@ -1,5 +1,6 @@
 import os
 import glob
+import json
 from typing import List, Dict, Any
 from utils.logger import logger_instance
 from knowledge.vector_store import VectorStore, KNOWLEDGE_COLLECTION
@@ -35,9 +36,32 @@ class KnowledgeBase:
         if self.chunk_overlap >= self.chunk_size:
             self.chunk_overlap = self.chunk_size - 1
         self.logger = logger_instance.get_logger("knowledge_base")
+        self.provenance = self._load_manifest()
         self.logger.info(
             f"KnowledgeBase initialized, path: {self.knowledge_path}"
         )
+
+    def _load_manifest(self) -> Dict[str, Any]:
+        """Read per-document provenance from the corpus manifest, if present."""
+        path = os.path.join(self.knowledge_path, "corpus_manifest.json")
+        if not os.path.exists(path):
+            return {}
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f).get("documents", {})
+        except (OSError, ValueError) as exc:
+            self.logger.warning(f"Could not read corpus manifest: {exc}")
+            return {}
+
+    def _provenance_for(self, filename: str) -> Dict[str, str]:
+        """Manifest fields for one file, skipping anything not filled in.
+
+        Chroma rejects None in metadata, so unset fields are left out rather
+        than written as empty values.
+        """
+        entry = self.provenance.get(filename, {})
+        wanted = ("authority", "jurisdiction", "version", "effective_date")
+        return {key: entry[key] for key in wanted if entry.get(key)}
 
     def is_populated(self) -> bool:
         """Check if this knowledge collection already has documents loaded."""
@@ -79,8 +103,10 @@ class KnowledgeBase:
                     content = f.read()
 
                 chunks = self._chunk_document(content, filename)
+                provenance = self._provenance_for(filename)
                 for i, chunk in enumerate(chunks):
                     chunk_id = f"kb_{filename}_{i}"
+                    chunk["metadata"].update(provenance)
                     all_chunks.append(chunk["text"])
                     all_metadatas.append(chunk["metadata"])
                     all_ids.append(chunk_id)

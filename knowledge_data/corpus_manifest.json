@@ -1,0 +1,149 @@
+{
+  "_note": "Provenance for each corpus document. Attached to every chunk at ingestion so a citation carries its source, version and jurisdiction. Fields left null are not stated in the corpus text and must be filled from the authoritative instrument before any provenance claim is made. An entry is marked verified once its provenance and the provisions it records have been checked against the publisher's own text, and the version field names the instrument that was checked. Entries that remain unverified have not yet been through that check.",
+  "documents": {
+    "basel_framework.md": {
+      "title": "Basel Framework - Basel III and Basel IV",
+      "authority": "Basel Committee on Banking Supervision",
+      "jurisdiction": "International",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "cobit.md": {
+      "title": "COBIT - Control Objectives for Information and Related Technologies",
+      "authority": "ISACA",
+      "jurisdiction": "International",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "csa_ccm.md": {
+      "title": "CSA CCM - Cloud Security Alliance Cloud Controls Matrix",
+      "authority": "Cloud Security Alliance",
+      "jurisdiction": "International",
+      "version": "v4.0",
+      "effective_date": null,
+      "verified": false
+    },
+    "fatf_guidelines.md": {
+      "title": "FATF - Recommendations and Fintech Guidance",
+      "authority": "Financial Action Task Force",
+      "jurisdiction": "International",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "gdpr.md": {
+      "title": "GDPR - General Data Protection Regulation",
+      "authority": "European Parliament and Council",
+      "jurisdiction": "European Union",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "hipaa.md": {
+      "title": "HIPAA - Health Insurance Portability and Accountability Act",
+      "authority": "US Department of Health and Human Services",
+      "jurisdiction": "United States",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "iso_22301.md": {
+      "title": "ISO 22301 - Business Continuity Management Systems",
+      "authority": "International Organization for Standardization",
+      "jurisdiction": "International",
+      "version": "2019",
+      "effective_date": null,
+      "verified": false
+    },
+    "iso_27001.md": {
+      "title": "ISO/IEC 27001 - Information Security Management System",
+      "authority": "International Organization for Standardization",
+      "jurisdiction": "International",
+      "version": "2022",
+      "effective_date": null,
+      "verified": false
+    },
+    "iso_31000.md": {
+      "title": "ISO 31000 - Risk Management Principles and Guidelines",
+      "authority": "International Organization for Standardization",
+      "jurisdiction": "International",
+      "version": "2018",
+      "effective_date": null,
+      "verified": false
+    },
+    "nist_csf.md": {
+      "title": "NIST Cybersecurity Framework",
+      "authority": "National Institute of Standards and Technology",
+      "jurisdiction": "United States",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "pakistan_aml_cft.md": {
+      "title": "Pakistan Anti-Money Laundering / Counter-Financing of Terrorism",
+      "authority": "Government of Pakistan",
+      "jurisdiction": "Pakistan",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "pci_dss.md": {
+      "title": "PCI DSS - Payment Card Industry Data Security Standard",
+      "authority": "PCI Security Standards Council",
+      "jurisdiction": "International",
+      "version": "v4.0",
+      "effective_date": null,
+      "verified": false
+    },
+    "peca_2016.md": {
+      "title": "Prevention of Electronic Crimes Act (PECA) 2016",
+      "authority": "Government of Pakistan",
+      "jurisdiction": "Pakistan",
+      "version": "Act XL of 2016, as on pakistancode.gov.pk",
+      "effective_date": null,
+      "verified": true
+    },
+    "psd2_open_banking.md": {
+      "title": "PSD2 - Payment Services Directive 2 and Open Banking",
+      "authority": "European Parliament and Council",
+      "jurisdiction": "European Union",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "sbp_regulations.md": {
+      "title": "SBP - Fintech and Digital Financial Services Regulations",
+      "authority": "State Bank of Pakistan",
+      "jurisdiction": "Pakistan",
+      "version": "BPRD Circular No. 10 of 2019 for branchless banking; Regulations for EMIs 2023; onboarding provisions consolidated by BPRD Circular No. 01 of 2025",
+      "effective_date": null,
+      "verified": true
+    },
+    "secp_guidelines.md": {
+      "title": "SECP - Fintech Regulations",
+      "authority": "Securities and Exchange Commission of Pakistan",
+      "jurisdiction": "Pakistan",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "soc2.md": {
+      "title": "SOC 2 - Service Organization Control 2",
+      "authority": "American Institute of Certified Public Accountants",
+      "jurisdiction": "United States",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    },
+    "swift_csp.md": {
+      "title": "SWIFT Customer Security Programme",
+      "authority": "SWIFT",
+      "jurisdiction": "International",
+      "version": null,
+      "effective_date": null,
+      "verified": false
+    }
+  }
+}

@@ -36,15 +36,16 @@ QUESTIONS = [
         "id": "SBP-01",
         "standard": "SBP EMI Regulations 2019",
         "question": (
-            "Under SBP EMI Regulations 2019, what is the maximum e-wallet balance "
-            "limit for a Level 2 verified account, and what KYC documentation is "
-            "required to reach that tier?"
+            "Under the SBP EMI Regulations, what is the maximum balance for an "
+            "Enhanced E-Money Wallet, and what additional controls are required to "
+            "offer it?"
         ),
         "ground_truth": (
-            "The maximum e-wallet balance limit for a Level 2 (L2) verified account "
-            "is PKR 500,000 under SBP EMI Regulations 2019. Level 2 requires full KYC "
-            "verification with source of income documentation. There is no monthly "
-            "transaction limit for L2 accounts."
+            "An Enhanced E-Money Wallet may hold up to PKR 1,000,000 under the "
+            "Regulations for EMIs, 2023, para 14(III). Offering it requires a "
+            "commercial operation licence and prior application to PSP and OD, with "
+            "proof of income or source of funds, CNIC and SIM pairing, transaction "
+            "monitoring and customer risk profiling."
         ),
     },
     {
@@ -56,10 +57,10 @@ QUESTIONS = [
             "and what verification method is required to open one?"
         ),
         "ground_truth": (
-            "A Level 1 (L1) account has a monthly transaction limit of PKR 80,000 and "
-            "a balance limit of PKR 400,000. Biometric verification is required to open "
-            "an L1 account. This is defined in the SBP Branchless Banking Regulations "
-            "(2008, amended 2016)."
+            "A Level 1 (L1) account has a daily limit of PKR 50,000 and a monthly "
+            "transaction limit of PKR 200,000. No annual limit and no maximum balance "
+            "are prescribed. Biometric verification is required to open an L1 account. "
+            "This is defined in BPRD Circular No. 10 of 2019."
         ),
     },
     {
@@ -86,21 +87,22 @@ QUESTIONS = [
             "and what is the threshold that triggers the obligation?"
         ),
         "ground_truth": (
-            "SBP-regulated entities must notify SBP within 72 hours of discovering a "
-            "personal data breach that may affect customer interests or regulatory "
-            "compliance. The obligation applies to any breach that meets this threshold, "
-            "as stated in the SBP customer data privacy and consent requirements."
+            "SBP does not set a 72-hour deadline. Under the Regulations for EMIs, 2023, "
+            "section 21, all security breaches must be reported immediately, with a "
+            "detailed report within 15 days. For banks and microfinance banks, BPRD "
+            "Circular No. 05 of 2017 requires incidents involving compromised customer "
+            "data to be reported to BPRD within 48 hours."
         ),
     },
     {
         "id": "PECA-01",
         "standard": "PECA 2016",
         "question": (
-            "What is the penalty for electronic fraud under Section 13 of PECA 2016, "
+            "What is the penalty for electronic fraud under Section 14 of PECA 2016, "
             "and what specific activities does this section cover?"
         ),
         "ground_truth": (
-            "Section 13 of PECA 2016 (Electronic Fraud) prescribes imprisonment of up "
+            "Section 14 of PECA 2016 (Electronic Fraud) prescribes imprisonment of up "
             "to 2 years, or a fine of up to PKR 10 million, or both. It covers using "
             "any information system to interfere with data or a system with dishonest "
             "intent, including phishing, card skimming, and unauthorized transaction "
@@ -111,11 +113,11 @@ QUESTIONS = [
         "id": "PECA-02",
         "standard": "PECA 2016",
         "question": (
-            "Under Section 29 of PECA 2016, for how long can service providers be "
+            "Under Section 31 of PECA 2016, for how long can service providers be "
             "required to preserve data upon a government request?"
         ),
         "ground_truth": (
-            "Under Section 29 of PECA 2016, service providers may be required to "
+            "Under Section 31 of PECA 2016, service providers may be required to "
             "preserve specified data for up to 90 days upon a government request. "
             "Financial institutions should maintain transaction logs and system "
             "access records to meet this obligation."
