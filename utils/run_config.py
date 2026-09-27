@@ -24,7 +24,11 @@ load_dotenv()
 # Pinned snapshot. The bare "gpt-4o" alias moves over time, which makes any
 # result recorded against it impossible to reproduce later.
 DEFAULT_MODEL_SNAPSHOT = "gpt-4o-2024-08-06"
-DEFAULT_EMBEDDING_SNAPSHOT = "text-embedding-3-small"
+
+# No dated snapshot is published for the embedding models, so this is an alias
+# and the vectors behind a stored result cannot be pinned the same way. The
+# corpus hash detects a re-embedding, but not a silent change upstream.
+DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
 
 # Packages whose versions materially affect generation or retrieval output.
 TRACKED_PACKAGES = ["litellm", "openai", "chromadb", "pydantic", "tiktoken"]
@@ -41,8 +45,8 @@ def litellm_model() -> str:
 
 
 def embedding_model() -> str:
-    """Return the embedding model identifier."""
-    return os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_SNAPSHOT)
+    """Return the embedding model identifier, which is an alias not a snapshot."""
+    return os.getenv("EMBEDDING_MODEL", DEFAULT_EMBEDDING_MODEL)
 
 
 def seed() -> int:

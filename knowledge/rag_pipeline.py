@@ -138,7 +138,15 @@ class RAGPipeline:
             score = result.get("relevance_score", 0.0)
             content = result["content"]
 
+            metadata = result.get("metadata", {})
+            version = metadata.get("version", "")
+            jurisdiction = metadata.get("jurisdiction", "")
+
             citation = f"[Source: {source}"
+            if version:
+                citation += f" | Version: {version}"
+            if jurisdiction:
+                citation += f" | Jurisdiction: {jurisdiction}"
             if section:
                 citation += f" | Section: {section}"
             citation += f" | Relevance: {score:.2f}]"

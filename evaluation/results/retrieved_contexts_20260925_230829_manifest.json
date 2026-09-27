@@ -1,0 +1,8 @@
+{
+  "generated": "2026-09-25T23:08:29",
+  "source_csv": "ablation_20260903_014438.csv",
+  "rows": 245,
+  "unique_contexts": 245,
+  "embedding_model": "text-embedding-3-small",
+  "git_commit": "a0e7ab2788b20b5df5f4aec76fe7c81d9bed7bfd"
+}

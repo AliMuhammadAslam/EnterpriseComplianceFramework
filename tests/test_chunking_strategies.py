@@ -38,6 +38,7 @@ class _ChunkerOnly(kb.KnowledgeBase):
         self.chunk_size = 500
         self.chunk_overlap = 50
         self.logger = _NullLogger()
+        self.provenance = self._load_manifest()
 
 
 def control_families(text):
@@ -128,6 +129,39 @@ class TestStrategiesDiffer(unittest.TestCase):
             [c["text"] for c in fixed],
             "the two strategies must not be equivalent, or the ablation is vacuous",
         )
+
+
+class TestCorpusProvenance(unittest.TestCase):
+    """Provenance from the manifest must reach the stored chunk metadata."""
+
+    def setUp(self):
+        self.kb = _ChunkerOnly(kb.SECTION_AWARE)
+
+    def test_manifest_is_loaded(self):
+        self.assertIn("iso_27001.md", self.kb.provenance)
+
+    def test_known_document_carries_authority_and_jurisdiction(self):
+        fields = self.kb._provenance_for("iso_27001.md")
+        self.assertEqual(fields["version"], "2022")
+        self.assertEqual(fields["jurisdiction"], "International")
+        self.assertIn("Standardization", fields["authority"])
+
+    def test_unfilled_fields_are_omitted_not_none(self):
+        # Chroma rejects None, so a blank effective date must not be written.
+        fields = self.kb._provenance_for("basel_framework.md")
+        self.assertNotIn("effective_date", fields)
+        self.assertNotIn("version", fields)
+        self.assertTrue(all(v for v in fields.values()))
+
+    def test_document_missing_from_manifest_returns_nothing(self):
+        self.assertEqual(self.kb._provenance_for("not_a_real_file.md"), {})
+
+    def test_provenance_merges_into_chunk_metadata(self):
+        chunks = self.kb._chunk_document(DOCUMENT, "iso_27001.md")
+        chunks[0]["metadata"].update(self.kb._provenance_for("iso_27001.md"))
+        metadata = chunks[0]["metadata"]
+        self.assertEqual(metadata["source"], "iso_27001.md")
+        self.assertEqual(metadata["version"], "2022")
 
 
 if __name__ == "__main__":

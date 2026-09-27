@@ -15,14 +15,17 @@ class MemoryEntry(BaseModel):
     timestamp: datetime
     type: str
     metadata: Optional[Dict[str, Any]] = None
+    # Defaults so memory files written before this field existed still load.
+    user_id: str = "default"
 
 
 class Memory:
     """Session memory for the agent.
 
-    Short-term memory holds the current conversation in-process.
-    Long-term memory persists completed sessions to a JSON file on disk
-    so conversation history survives restarts.
+    Short-term memory holds the current conversation in-process. Long-term
+    memory persists completed sessions to a JSON file. Each interaction
+    records the account it belongs to, and the per-user histories are rebuilt
+    from that file on start, so follow-up context survives a restart.
     """
 
     def __init__(self, memory_file: str = None):
@@ -49,6 +52,7 @@ class Memory:
             timestamp=datetime.now(),
             type="interaction",
             metadata=metadata,
+            user_id=user_id,
         )
         self.short_term_memory.append(entry)
         self.conversation_by_user.setdefault(user_id, []).append(entry)
@@ -103,6 +107,7 @@ class Memory:
                 "interaction_count": len(self.short_term_memory),
                 "start_time": self.short_term_memory[0].timestamp.isoformat(),
                 "end_time": datetime.now().isoformat(),
+                "users": sorted({e.user_id for e in self.short_term_memory}),
             },
         )
 
@@ -118,9 +123,38 @@ class Memory:
                 self.long_term_memory = [
                     MemoryEntry(**entry) for entry in data.get("long_term", [])
                 ]
-                self.logger.info(f"Loaded {len(self.long_term_memory)} long-term memories")
+                self._rebuild_user_conversations()
+                self.logger.info(
+                    f"Loaded {len(self.long_term_memory)} long-term memories, "
+                    f"restored history for {len(self.conversation_by_user)} user(s)"
+                )
             except Exception as e:
                 self.logger.error(f"Failed to load memory file: {e}")
+
+    def _rebuild_user_conversations(self):
+        """Rebuild each account's history from the saved sessions.
+
+        Without this the per-user history starts empty after a restart and a
+        follow-up question loses the exchange it refers to.
+        """
+        restored: Dict[str, List[MemoryEntry]] = {}
+
+        for session in self.long_term_memory:
+            if session.type != "conversation_session":
+                continue
+            for raw in session.content.get("interactions", []):
+                try:
+                    entry = MemoryEntry(**raw)
+                except Exception as e:
+                    self.logger.warning(f"Skipped an unreadable interaction: {e}")
+                    continue
+                if entry.type == "interaction":
+                    restored.setdefault(entry.user_id, []).append(entry)
+
+        for entries in restored.values():
+            entries.sort(key=lambda e: e.timestamp)
+
+        self.conversation_by_user = restored
 
     def _save_persistent_memory(self):
         try:

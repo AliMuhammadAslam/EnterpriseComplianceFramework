@@ -12,7 +12,6 @@ reports/
 audit_logs/
 evidence_traces/
 .pytest_cache/
-thesis_documentation.md
-evaluation/results/
+notes/
+# evaluation/results/ is tracked on purpose: the reported tables come from it.
 knowledge_data/.kb_hash
-REVISION_PLAN.md

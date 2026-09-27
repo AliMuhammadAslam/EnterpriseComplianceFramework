@@ -41,10 +41,15 @@ class VectorStore:
         ids: List[str],
         collection_name: str = KNOWLEDGE_COLLECTION,
     ):
-        """Add documents to a regulatory knowledge collection."""
+        """Add or replace documents in a regulatory knowledge collection.
+
+        Upsert rather than add: chunk ids are derived from the filename and
+        position, so a re-ingest reuses them. add() ignores ids that already
+        exist, which silently kept stale text and metadata in the store.
+        """
         collection = self._get_or_create_collection(collection_name)
         embeddings = self.embedding_service.embed_batch(documents)
-        collection.add(
+        collection.upsert(
             documents=documents,
             embeddings=embeddings,
             metadatas=metadatas,

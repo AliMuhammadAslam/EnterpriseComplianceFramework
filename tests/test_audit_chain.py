@@ -159,5 +159,37 @@ class TestConcurrency(_ChainTestCase):
         self.assertEqual(len(self.read_lines()), 100)
 
 
+class TestSummaryScoping(_ChainTestCase):
+    """The summary must not tell one account about another's activity."""
+
+    def setUp(self):
+        super().setUp()
+        for _ in range(3):
+            self.audit.log("CHAT_QUERY", user_id="john")
+        self.audit.log("EVALUATION_RUN", user_id="sarah")
+        self.audit.log("DOCUMENT_UPLOAD", user_id="sarah")
+
+    def test_summary_for_a_user_counts_only_their_events(self):
+        summary = self.audit.get_summary(user_id="john")
+        self.assertEqual(summary["total_events"], 3)
+        self.assertEqual(list(summary["users"]), ["john"])
+
+    def test_summary_for_a_user_hides_other_accounts(self):
+        summary = self.audit.get_summary(user_id="john")
+        self.assertNotIn("sarah", summary["users"])
+        self.assertNotIn("EVALUATION_RUN", summary["actions"])
+
+    def test_user_with_no_events_gets_an_empty_summary(self):
+        summary = self.audit.get_summary(user_id="nobody")
+        self.assertEqual(summary["total_events"], 0)
+        self.assertEqual(summary["users"], {})
+        self.assertIsNone(summary["earliest"])
+
+    def test_unfiltered_summary_still_available_for_operators(self):
+        summary = self.audit.get_summary()
+        self.assertEqual(summary["total_events"], 5)
+        self.assertEqual(set(summary["users"]), {"john", "sarah"})
+
+
 if __name__ == "__main__":
     unittest.main()

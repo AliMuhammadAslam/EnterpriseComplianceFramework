@@ -212,9 +212,17 @@ class AuditLogger:
         entries.sort(key=lambda x: x["timestamp"], reverse=True)
         return entries[offset:offset + limit]
 
-    def get_summary(self) -> Dict[str, Any]:
-        """Return aggregate statistics from the audit log."""
+    def get_summary(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return aggregate statistics from the audit log.
+
+        Scoped to one account unless user_id is None. Without a filter the
+        per-user counts tell any caller who else uses the system and how much,
+        so callers serving a signed-in user must pass their own id.
+        """
         entries = self._read_all_entries()
+        if user_id is not None:
+            entries = [e for e in entries if e["user_id"] == user_id]
+
         action_counts = {}
         user_counts = {}
         for entry in entries:

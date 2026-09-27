@@ -20,7 +20,16 @@ from evaluation.report_store import ReportStore
 from auth.user_store import UserStore
 
 app = Flask(__name__)
-app.secret_key = os.getenv("SECRET_KEY", "dev-secret-change-me")
+
+# No fallback value. A shipped default would be a published signing key, and
+# anyone holding it could forge a session cookie for any account.
+app.secret_key = os.getenv("SECRET_KEY")
+if not app.secret_key:
+    raise RuntimeError(
+        "SECRET_KEY is not set. Generate one with "
+        "`python -c \"import secrets; print(secrets.token_hex(32))\"` "
+        "and add it to your .env before starting the app."
+    )
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
@@ -541,9 +550,9 @@ def audit_logs():
 @app.route("/audit/summary", methods=["GET"])
 @login_required
 def audit_summary():
-    """Return audit trail aggregate statistics."""
+    """Return audit trail statistics for the signed-in account."""
     try:
-        summary = audit.get_summary()
+        summary = audit.get_summary(user_id=_current_user_id())
         return jsonify(summary)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
