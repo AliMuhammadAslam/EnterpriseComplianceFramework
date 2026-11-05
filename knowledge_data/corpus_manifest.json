@@ -39,7 +39,14 @@
       "jurisdiction": "European Union",
       "version": null,
       "effective_date": null,
-      "verified": false
+      "verified": false,
+      "checked_provisions": [
+        {
+          "provisions": ["Article 33", "Article 34"],
+          "source": "Regulation (EU) 2016/679, OJ L 119 (L_2016119EN), EU Publications Office, cellar 3e485e15-11bd-11e6-ba9a-01aa75ed71a1",
+          "checked_on": "2026-11-05"
+        }
+      ]
     },
     "hipaa.md": {
       "title": "HIPAA - Health Insurance Portability and Accountability Act",
@@ -103,7 +110,14 @@
       "jurisdiction": "Pakistan",
       "version": "Act XL of 2016, as on pakistancode.gov.pk",
       "effective_date": null,
-      "verified": true
+      "verified": true,
+      "checked_provisions": [
+        {
+          "provisions": ["Section 31", "Section 32"],
+          "source": "Consolidated text, pakistancode.gov.pk (pdffiles/administrator6a061efe0ed5bd153fa8b79b8eb4cba7.pdf, includes amendments up to Act No. II of 2025)",
+          "checked_on": "2026-11-05"
+        }
+      ]
     },
     "psd2_open_banking.md": {
       "title": "PSD2 - Payment Services Directive 2 and Open Banking",

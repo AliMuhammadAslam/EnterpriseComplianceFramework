@@ -164,16 +164,20 @@ QUESTIONS = [
     {
         "id": "GDPR-01",
         "standard": "GDPR",
+        # Revised: the question asked which articles govern each obligation and
+        # the answer cited Articles 33 and 34, but gdpr.md states both
+        # obligations without article numbers. A grounded answer could not
+        # supply them, so the judge scored answers from model memory higher
+        # than ones that kept to the retrieved text.
         "question": (
-            "Under GDPR, what are the two separate breach notification obligations "
-            "and which specific articles govern each one?"
+            "Under GDPR, what are the two separate breach notification obligations, "
+            "and what deadline or trigger applies to each?"
         ),
         "ground_truth": (
-            "There are two separate obligations: (1) Article 33 requires the data "
-            "controller to notify the competent supervisory authority within 72 hours "
-            "of becoming aware of a breach. (2) Article 34 requires notifying the "
-            "affected individuals without undue delay if the breach poses a high risk "
-            "to their rights and freedoms."
+            "There are two separate obligations: (1) the supervisory authority must "
+            "be notified within 72 hours of becoming aware of a breach. (2) Affected "
+            "individuals must be notified if the breach poses a high risk to their "
+            "rights."
         ),
     },
 ]

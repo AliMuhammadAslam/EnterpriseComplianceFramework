@@ -334,11 +334,16 @@ QUESTIONS_V2 = [
         "category": "single_fact",
         "split": "holdout",
         "standard": "PECA 2016",
-        "question": "Under PECA 2016, for how long may a service provider be required to "
-                    "preserve specified data on government request, and under which section?",
-        "ground_truth": "Up to 90 days, under Section 31, expedited preservation and "
-                        "acquisition of data. Section 32 separately requires service providers "
-                        "to retain traffic data for at least one year.",
+        # Revised against the Act's text on pakistancode.gov.pk: preservation
+        # is ordered by an authorised officer's written notice, not on a
+        # general "government request", and Section 32 retention is a
+        # separate obligation, both now in peca_2016.md.
+        "question": "Under PECA 2016, for how long can an authorised officer require "
+                    "specified data to be preserved, and under which section?",
+        "ground_truth": "For a period not exceeding ninety days, under Section 31, by "
+                        "written notice to the person in control of the information "
+                        "system. The Court may extend the period on the authorised "
+                        "officer's application.",
     },
 
     {

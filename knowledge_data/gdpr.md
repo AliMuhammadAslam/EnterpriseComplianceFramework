@@ -69,9 +69,19 @@ Applies to any organization that processes personal data of EU/EEA residents, re
 ### Data Protection Officer (DPO)
 - Required for public authorities, organizations conducting large-scale monitoring, or processing special categories of data
 
-### Data Breach Notification
-- Notify supervisory authority within 72 hours of becoming aware of a breach
-- Notify affected individuals if breach poses high risk to their rights
+### Notification of a Personal Data Breach to the Supervisory Authority (Article 33)
+- The controller must notify the competent supervisory authority without undue delay and, where feasible, not later than 72 hours after becoming aware of the breach, unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons
+- A notification not made within 72 hours must be accompanied by reasons for the delay
+- The processor must notify the controller without undue delay after becoming aware of a personal data breach
+- The notification must at least describe the nature of the breach (including, where possible, the categories and approximate number of data subjects and of personal data records concerned), give the name and contact details of the data protection officer or other contact point, describe the likely consequences, and describe the measures taken or proposed to address the breach
+- Where the information cannot all be provided at the same time, it may be provided in phases without undue further delay
+- The controller must document every personal data breach, including the facts relating to it, its effects and the remedial action taken
+
+### Communication of a Personal Data Breach to the Data Subject (Article 34)
+- Where a breach is likely to result in a high risk to the rights and freedoms of natural persons, the controller must communicate it to the data subject without undue delay
+- The communication must describe the nature of the breach in clear and plain language and contain at least the information and measures referred to in points (b), (c) and (d) of Article 33(3)
+- It is not required if the affected data was protected by measures that render it unintelligible to anyone not authorised to access it, such as encryption; if subsequent measures ensure the high risk is no longer likely to materialise; or if it would involve disproportionate effort, in which case a public communication or similar equally effective measure is required instead
+- If the controller has not communicated the breach, the supervisory authority may require it to do so, or may decide that one of these conditions is met
 
 ### Cross-Border Data Transfers
 - Transfers outside EU/EEA require adequate safeguards
