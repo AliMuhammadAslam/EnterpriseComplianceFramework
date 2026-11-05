@@ -3,18 +3,32 @@ from typing import List
 from litellm import completion
 from utils.logger import logger_instance
 from utils import run_config
-from evaluation import citation_validator
+from evaluation import citation_validator, risk_score_check
 from knowledge.rag_pipeline import RAGPipeline
 from dotenv import load_dotenv
 
 load_dotenv()
 
+# Used when a request names no standards. Single source of truth: the web app
+# records this same list as the standards a report was evaluated against.
+DEFAULT_STANDARDS = [
+    "ISO 27001", "SOC 2", "GDPR", "NIST CSF", "PCI DSS",
+    "SBP Regulations", "FATF", "SECP Guidelines", "Pakistan AML/CFT",
+]
+
+# Each retrieved requirement is used as a company-document query, truncated so
+# one long chunk does not dominate its own embedding.
+REQUIREMENT_QUERY_CHARS = 1000
+
 
 class EvaluationEngine:
     """Runs compliance gap analysis against uploaded company documents."""
 
-    def __init__(self, rag_pipeline: RAGPipeline = None):
+    def __init__(self, rag_pipeline: RAGPipeline = None, knowledge_base=None):
         self.rag_pipeline = rag_pipeline or RAGPipeline()
+        # Resolves a standard name to its corpus file, so each standard's
+        # retrieval can be kept to its own document.
+        self.knowledge_base = knowledge_base
         self.logger = logger_instance.get_logger("evaluation_engine")
         self.model_config = {
             "model": run_config.litellm_model(),
@@ -34,6 +48,33 @@ class EvaluationEngine:
         verbose: bool = False,
     ) -> str:
         """Evaluate a user's documents against the given standards and return a markdown report."""
+        report_text, _ = self.evaluate_with_evidence(
+            user_id=user_id,
+            standards=standards,
+            industry=industry,
+            country=country,
+            specific_query=specific_query,
+            doc_ids=doc_ids,
+            verbose=verbose,
+        )
+        return report_text
+
+    def evaluate_with_evidence(
+        self,
+        user_id: str,
+        standards: List[str] = None,
+        industry: str = "",
+        country: str = "",
+        specific_query: str = "",
+        doc_ids: List[str] = None,
+        verbose: bool = False,
+    ) -> tuple:
+        """Same as evaluate_compliance, plus what the report was built from.
+
+        The evidence holds the chunks that entered the prompt, the outcome of
+        the citation and risk score checks, and each step taken, so a report
+        can be traced the way a chat answer already was.
+        """
         self.logger.info(
             f"Starting compliance evaluation for user: {user_id}"
         )
@@ -41,10 +82,7 @@ class EvaluationEngine:
             print(f"[EVALUATION] Starting compliance evaluation for user: {user_id}")
 
         if not standards:
-            standards = [
-                "ISO 27001", "SOC 2", "GDPR", "NIST CSF", "PCI DSS",
-                "SBP Regulations", "FATF", "SECP Guidelines", "Pakistan AML/CFT",
-            ]
+            standards = list(DEFAULT_STANDARDS)
 
         if verbose:
             print(f"[EVALUATION] Standards selected ({len(standards)}): {', '.join(standards)}")
@@ -57,25 +95,37 @@ class EvaluationEngine:
         if specific_query:
             company_query = specific_query
 
+        # one query per standard avoids crowding in combined similarity search
+        if verbose:
+            print("[EVALUATION] Retrieving regulatory context per standard (anti-crowding)...")
+        regulatory_context, regulatory_results = self._retrieve_per_standard_context(
+            standards, industry, country, verbose=verbose
+        )
+        requirement_texts = [r.get("content", "") for r in regulatory_results]
+        if verbose:
+            print(f"[EVALUATION] Retrieved {len(regulatory_context)} chars of regulatory context total")
+
+        # Search the company documents with the retrieved requirements
+        # themselves. A single generic query reached only a few sections of a
+        # long policy, so gaps were reported for content that existed.
         if verbose:
             if doc_ids:
                 print(f"[EVALUATION] Retrieving company documents (restricted to {len(doc_ids)} selected document(s))...")
             else:
                 print("[EVALUATION] Retrieving company documents from vector store (all uploaded documents)...")
-        company_context = self.rag_pipeline.retrieve_company_docs_only(
-            user_id, company_query, doc_ids=doc_ids
+        company_queries = [company_query] + [
+            text[:REQUIREMENT_QUERY_CHARS] for text in requirement_texts
+        ]
+        company_context, company_results = (
+            self.rag_pipeline.retrieve_company_docs_for_queries_with_results(
+                user_id, company_queries, doc_ids=doc_ids
+            )
         )
         if verbose:
-            print(f"[EVALUATION] Retrieved {len(company_context)} chars of company document context")
-
-        # one query per standard avoids crowding in combined similarity search
-        if verbose:
-            print("[EVALUATION] Retrieving regulatory context per standard (anti-crowding)...")
-        regulatory_context = self._retrieve_per_standard_context(
-            standards, industry, country, verbose=verbose
-        )
-        if verbose:
-            print(f"[EVALUATION] Retrieved {len(regulatory_context)} chars of regulatory context total")
+            print(
+                f"[EVALUATION] Retrieved {len(company_context)} chars of company document "
+                f"context from {len(company_queries)} queries"
+            )
 
         if verbose:
             print(f"[EVALUATION] Generating structured report via {self.model_config['model']} (temperature={self.model_config['temperature']})...")
@@ -90,6 +140,16 @@ class EvaluationEngine:
         if verbose:
             print(f"[EVALUATION] Report generated ({len(report_text)} chars)")
 
+        # The model fills the scoring table in; recompute each row from its
+        # S, L and G so a wrong score, band or escalation marker is corrected
+        # and listed rather than published as the rule's output.
+        report_text, score_check = risk_score_check.check_and_correct(report_text)
+        if verbose:
+            print(
+                f"[EVALUATION] Risk score check: {score_check.rows_checked} row(s), "
+                f"{len(score_check.corrections)} corrected"
+            )
+
         # The prompt asks for retrieved identifiers only, but a prompt cannot
         # guarantee it, so check each one against what was actually retrieved.
         # Pass the two contexts separately: an uploaded policy must not be able
@@ -99,6 +159,7 @@ class EvaluationEngine:
             regulatory_context=regulatory_context,
             company_context=company_context,
         )
+        report_text += risk_score_check.format_check(score_check)
         report_text += citation_validator.format_report(validation)
 
         self.logger.info(
@@ -118,7 +179,33 @@ class EvaluationEngine:
         self.logger.info("Compliance evaluation completed")
         if verbose:
             print("[EVALUATION] Done")
-        return report_text
+
+        evidence = {
+            "standards": list(standards),
+            "doc_ids": list(doc_ids or []),
+            "retrieved": regulatory_results + company_results,
+            "validation": {
+                "citations": validation.summary(),
+                "risk_score_check": {
+                    "rows_checked": score_check.rows_checked,
+                    "corrections": score_check.corrections,
+                    "unparsed_rows": len(score_check.unparsed),
+                },
+            },
+            "steps": [
+                ("regulatory_retrieval", {"standards": len(standards)},
+                 f"{len(regulatory_results)} chunks retrieved", bool(regulatory_results)),
+                ("company_retrieval", {"queries": len(company_queries), "doc_ids": len(doc_ids or [])},
+                 f"{len(company_results)} chunks retrieved", True),
+                ("report_generation", {"model": self.model_config["model"]},
+                 f"{len(report_text)} chars", True),
+                ("risk_score_check", {},
+                 f"{score_check.rows_checked} rows, {len(score_check.corrections)} corrected", True),
+                ("citation_validation", {},
+                 f"{len(validation.supported)}/{validation.total} identifiers supported", True),
+            ],
+        }
+        return report_text, evidence
 
     def _retrieve_per_standard_context(
         self,
@@ -126,20 +213,49 @@ class EvaluationEngine:
         industry: str,
         country: str,
         verbose: bool = False,
-    ) -> str:
-        """Query the knowledge base once per standard to avoid similarity crowding."""
+    ) -> tuple:
+        """Query the knowledge base once per standard to avoid similarity crowding.
+
+        A separate query alone did not keep a standard's context to that
+        standard: "ISO 27001 ... Fintech Pakistan" ranked SECP, SBP and SWIFT
+        chunks above every ISO 27001 chunk. Where the standard maps to a corpus
+        file, retrieval is restricted to that file.
+
+        Returns the formatted context and the retrieved chunks themselves.
+        """
         sections = []
+        retrieved = []
         for std in standards:
             query = f"{std} requirements controls compliance obligations"
             if industry:
                 query += f" {industry}"
             if country:
                 query += f" {country}"
-            chunk = self.rag_pipeline.retrieve_knowledge_only(query)
+            source = (
+                self.knowledge_base.resolve_standard_source(std)
+                if self.knowledge_base else None
+            )
+            if source is None:
+                self.logger.warning(
+                    f"No corpus file matched standard '{std}'; using unrestricted retrieval"
+                )
+            chunk, results = self.rag_pipeline.retrieve_knowledge_with_results(
+                query, source=source
+            )
+            # Every corpus file has chunks, so nothing back means retrieval
+            # failed or the index is empty. Writing the report anyway produced
+            # findings with no regulatory text behind them, saved as success.
+            if not results:
+                raise RuntimeError(
+                    f"No regulatory context could be retrieved for '{std}'. "
+                    "The knowledge base may be empty or unavailable."
+                )
+            retrieved.extend(results)
             if verbose:
-                print(f"[EVALUATION]   -> {std}: retrieved {len(chunk)} chars")
+                where = f" from {source}" if source else " (unrestricted)"
+                print(f"[EVALUATION]   -> {std}: retrieved {len(chunk)} chars{where}")
             sections.append(f"=== {std} ===\n{chunk}")
-        return "\n\n".join(sections)
+        return "\n\n".join(sections), retrieved
 
     def _generate_evaluation(
         self,
@@ -243,6 +359,8 @@ CRITICAL RULES:
 
 Produce a detailed, structured compliance evaluation report. In the Standards Coverage section, list every one of the standards above exactly once with its status of Findings, Documentation gap, or Not applicable, so that no standard is silently omitted. Do not create empty Compliant Areas or Gap Analysis subsections for standards that are Not applicable. Cite specific clause/article/section numbers for every finding. In the Regulatory Risk Score and Prioritization section, include the scoring table with the S, L and G values shown for every gap."""
 
+        # Raise on failure. Returning an error page as report text used to get
+        # it validated, saved as a report and audited as a successful run.
         try:
             response = completion(
                 model=self.model_config["model"],
@@ -254,12 +372,9 @@ Produce a detailed, structured compliance evaluation report. In the Standards Co
                 max_tokens=self.model_config["max_tokens"],
                 seed=run_config.seed(),
             )
-            return response.choices[0].message.content.strip()
         except Exception as e:
             self.logger.error(f"Error generating evaluation: {e}")
-            return (
-                f"# Evaluation Error\n\n"
-                f"An error occurred while generating the compliance "
-                f"evaluation report: {str(e)}\n\n"
-                f"Please ensure your API key is valid and try again."
-            )
+            raise RuntimeError(
+                f"The compliance evaluation could not be generated: {e}"
+            ) from e
+        return response.choices[0].message.content.strip()

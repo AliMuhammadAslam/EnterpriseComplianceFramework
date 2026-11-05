@@ -136,6 +136,33 @@ def _git_commit() -> Optional[str]:
     return None
 
 
+def _git_uncommitted() -> Optional[List[str]]:
+    """Tracked or new files that differ from the recorded commit.
+
+    The commit hash alone said nothing about edits on top of it: a run once
+    recorded a commit that did not contain the script that produced it.
+    None if git is unavailable, an empty list for a clean tree. Results under
+    evaluation/results are excluded, since a run writes them itself.
+    """
+    try:
+        result = subprocess.run(
+            ["git", "status", "--porcelain", "--untracked-files=normal"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode != 0:
+            return None
+    except Exception:
+        return None
+    changed = []
+    for line in result.stdout.splitlines():
+        path = line[3:].strip().strip('"')
+        if path and not path.replace("\\", "/").startswith("evaluation/results/"):
+            changed.append(path)
+    return changed
+
+
 def _package_versions() -> Dict[str, str]:
     """Installed versions of the packages that affect output."""
     versions = {}
@@ -154,6 +181,7 @@ def run_manifest(knowledge_path: Optional[str] = None) -> Dict[str, Any]:
     the exact model snapshot, seed, corpus and code that produced them.
     """
     knowledge_path = knowledge_path or os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge_data")
+    uncommitted = _git_uncommitted()
     return {
         "recorded_at_utc": datetime.now(timezone.utc).isoformat(),
         "model": model_name(),
@@ -165,6 +193,9 @@ def run_manifest(knowledge_path: Optional[str] = None) -> Dict[str, Any]:
         "corpus_sha256": hash_corpus(knowledge_path),
         "corpus_files": corpus_manifest(knowledge_path),
         "git_commit": _git_commit(),
+        # True when the code that ran is not exactly the recorded commit.
+        "git_dirty": bool(uncommitted) if uncommitted is not None else None,
+        "git_uncommitted_files": uncommitted,
         "packages": _package_versions(),
         "python": platform.python_version(),
         "platform": platform.platform(),

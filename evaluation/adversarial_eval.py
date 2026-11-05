@@ -13,6 +13,7 @@ Run with:  python -m evaluation.adversarial_eval
 """
 
 import os
+import shutil
 import sys
 import tempfile
 from datetime import datetime
@@ -189,7 +190,10 @@ def main():
             print(f"  escalation raised: {validation.escalation_required}\n")
     finally:
         store.delete_company_collection(TEST_USER)
-        print(f"Cleaned up test collection for {TEST_USER}")
+        # The upload also wrote the file and a manifest under the user's
+        # upload folder; removing only the collection left those behind.
+        shutil.rmtree(os.path.join(manager.upload_dir, TEST_USER), ignore_errors=True)
+        print(f"Cleaned up test collection and uploads for {TEST_USER}")
 
     _write_report(results)
 

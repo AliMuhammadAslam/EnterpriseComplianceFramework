@@ -168,6 +168,20 @@ def _normalise(value: str) -> str:
     return cleaned.replace(",", "")
 
 
+def _find_identifier(haystack: str, needle: str) -> int:
+    """Position of a whole identifier in normalised text, or -1.
+
+    A plain substring search let "article 1" match inside "article 17", and
+    "a.5.1" inside "a.5.10", so an identifier absent from the corpus counted
+    as supported. The match must not run on into further digits, or start in
+    the middle of a word. A parent of a cited sub-part still matches, so
+    "article 17" is found in "article 17(3)" and "requirement 3" in
+    "requirement 3.4".
+    """
+    match = re.search(r"(?<![a-z0-9])" + re.escape(needle) + r"(?!\d)", haystack)
+    return match.start() if match else -1
+
+
 def extract_citations(text: str) -> List[Citation]:
     """Return every regulatory identifier and threshold found in text, deduplicated."""
     found: Dict[str, Citation] = {}
@@ -299,7 +313,7 @@ def validate(
 
     for citation in report.citations:
         for source, original, haystack in regulatory_chunks:
-            position = haystack.find(citation.normalised)
+            position = _find_identifier(haystack, citation.normalised)
             if position == -1:
                 continue
             citation.supported = True
@@ -312,7 +326,7 @@ def validate(
             (
                 source
                 for source, _, haystack in company_chunks
-                if haystack.find(citation.normalised) != -1
+                if _find_identifier(haystack, citation.normalised) != -1
             ),
             None,
         )
@@ -329,7 +343,7 @@ def validate(
 
         # Still record the source, so the reviewer can see what claimed it.
         for source, original, haystack in company_chunks:
-            position = haystack.find(citation.normalised)
+            position = _find_identifier(haystack, citation.normalised)
             if position == -1:
                 continue
             citation.untrusted_only = True

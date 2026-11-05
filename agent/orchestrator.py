@@ -44,7 +44,7 @@ class Orchestrator:
         self.vector_store = VectorStore()
         self.rag_pipeline = RAGPipeline(self.vector_store)
         self.knowledge_base = KnowledgeBase(self.vector_store)
-        self.evaluation_engine = EvaluationEngine(self.rag_pipeline)
+        self.evaluation_engine = EvaluationEngine(self.rag_pipeline, self.knowledge_base)
         self.upload_manager = UploadManager(self.vector_store)
         self.trace_store = EvidenceTraceStore()
 
@@ -55,7 +55,7 @@ class Orchestrator:
         """Ingest the knowledge base on startup; re-ingest if files have changed."""
         try:
             knowledge_path = os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge_data")
-            current_hash = self._hash_knowledge_files(knowledge_path)
+            current_hash = self.knowledge_base.index_fingerprint()
             hash_file = os.path.join(knowledge_path, ".kb_hash")
 
             stored_hash = ""
@@ -78,13 +78,6 @@ class Orchestrator:
                 self.logger.info("Knowledge base up to date, skipping ingestion")
         except Exception as e:
             self.logger.error(f"Error initialising knowledge base: {e}")
-
-    def _hash_knowledge_files(self, knowledge_path: str) -> str:
-        """SHA-256 hash of all knowledge files, used to detect content changes.
-
-        Same hash the run manifest records as the corpus identifier.
-        """
-        return run_config.hash_corpus(knowledge_path)
 
     def run(
         self,
@@ -254,7 +247,7 @@ class Orchestrator:
         verbose: bool = False,
     ) -> str:
         """Delegate to the evaluation engine for a user's compliance report."""
-        return self.evaluation_engine.evaluate_compliance(
+        report, _ = self.evaluate_compliance_traced(
             user_id=user_id,
             standards=standards,
             industry=industry,
@@ -262,16 +255,80 @@ class Orchestrator:
             doc_ids=doc_ids,
             verbose=verbose,
         )
+        return report
 
-    def get_system_status(self) -> Dict[str, Any]:
-        """Return status for all pipeline components."""
+    def evaluate_compliance_traced(
+        self,
+        user_id: str,
+        standards: list = None,
+        industry: str = "",
+        country: str = "",
+        doc_ids: list = None,
+        verbose: bool = False,
+    ) -> tuple:
+        """Run an evaluation and record its evidence trace.
+
+        Returns (report, trace_id). Only chat answers were traced before, so
+        the main output of the system had no record of what it was built on.
+        """
+        report, evidence = self.evaluation_engine.evaluate_with_evidence(
+            user_id=user_id,
+            standards=standards,
+            industry=industry,
+            country=country,
+            doc_ids=doc_ids,
+            verbose=verbose,
+        )
+        trace_id = self._record_evaluation_trace(user_id, report, evidence)
+        return report, trace_id
+
+    def _record_evaluation_trace(self, user_id: str, report: str, evidence: dict) -> str:
+        """Write an evaluation's evidence trace; never fails the evaluation."""
+        try:
+            standards = evidence.get("standards", [])
+            doc_ids = evidence.get("doc_ids", [])
+            request = f"Compliance evaluation against: {', '.join(standards)}"
+            if doc_ids:
+                request += f" (documents: {', '.join(doc_ids)})"
+            trace = self.trace_store.build(
+                request=request,
+                user_id=user_id,
+                intent="compliance_evaluation",
+                model_configuration=run_config.model_configuration(),
+                retrieved=evidence.get("retrieved", []),
+                tool_calls=[
+                    ToolCall(name=name, arguments=args, outcome=outcome, succeeded=ok)
+                    for name, args, outcome, ok in evidence.get("steps", [])
+                ],
+                validation=evidence.get("validation"),
+                final_answer=report,
+            )
+            self.trace_store.save(trace)
+            return trace.trace_id
+        except Exception as e:
+            self.logger.error(f"Failed to record evaluation trace: {e}")
+            return ""
+
+    def get_system_status(self, user_id: Optional[str] = None) -> Dict[str, Any]:
+        """Return status for all pipeline components.
+
+        With a user_id, memory is reported for that user only. The totals
+        cover every account, so served to a signed-in user they showed how
+        much everyone else was using the system; the CLI operator keeps them.
+        """
+        if user_id is None:
+            memory_status = {
+                "short_term_entries": len(self.memory.short_term_memory),
+                "long_term_entries": len(self.memory.long_term_memory),
+            }
+        else:
+            memory_status = {
+                "conversation_entries": len(self.memory.conversation_by_user.get(user_id, [])),
+            }
         return {
             "components": {
                 "perception": "active",
-                "memory": {
-                    "short_term_entries": len(self.memory.short_term_memory),
-                    "long_term_entries": len(self.memory.long_term_memory),
-                },
+                "memory": memory_status,
                 "planner": "active",
                 "executor": "active",
                 "rag_pipeline": self.rag_pipeline.get_status(),
@@ -286,8 +343,10 @@ class Orchestrator:
         }
 
     def reset_session(self, user_id: str = "default"):
-        """Clear a user's conversation memory and start a fresh session."""
-        self.memory.end_current_session()
-        self.memory.start_new_session()
+        """Clear a user's conversation memory.
+
+        Only this user's history is touched. Ending the shared session here
+        used to close every other user's in-progress session as a side effect.
+        """
         self.memory.clear_user_conversation(user_id)
         self.logger.info(f"Session reset for user: {user_id}")

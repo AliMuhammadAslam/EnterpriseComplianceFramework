@@ -50,6 +50,29 @@ def default_csv():
     return chosen
 
 
+def run_manifest_path(csv_path):
+    """The manifest the ablation wrote next to a results CSV."""
+    folder, name = os.path.split(csv_path)
+    return os.path.join(folder, name.replace("ablation_", "ablation_manifest_", 1)
+                        .replace(".csv", ".json"))
+
+
+def corpus_check(csv_path):
+    """(matches, recorded_hash, current_hash) for the run behind a results CSV.
+
+    Contexts can only be rebuilt faithfully from the corpus the run used.
+    Rebuilding after a corpus correction silently swaps in text the model
+    never saw. recorded_hash is None when the run has no manifest.
+    """
+    current = run_config.hash_corpus(os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge_data"))
+    manifest = run_manifest_path(csv_path)
+    if not os.path.exists(manifest):
+        return False, None, current
+    with open(manifest, encoding="utf-8") as f:
+        recorded = json.load(f).get("corpus_sha256")
+    return recorded == current, recorded, current
+
+
 def export(path):
     with open(path, encoding="utf-8") as f:
         rows = [r for r in csv.DictReader(f) if r.get("answer")]
@@ -99,6 +122,9 @@ def write(records, source_csv):
         "unique_contexts": len({(r["question_id"], r["condition"]) for r in records}),
         "embedding_model": run_config.embedding_model(),
         "git_commit": run_config.run_manifest().get("git_commit"),
+        "corpus_sha256": run_config.hash_corpus(
+            os.getenv("KNOWLEDGE_BASE_PATH", "./knowledge_data")
+        ),
     }
     with open(out.replace(".jsonl", "_manifest.json"), "w", encoding="utf-8") as f:
         json.dump(meta, f, indent=2)
@@ -109,6 +135,14 @@ def write(records, source_csv):
 
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else default_csv()
+    matches, recorded, current = corpus_check(path)
+    if not matches:
+        print(
+            f"Refusing to rebuild contexts for {os.path.basename(path)}: the corpus "
+            f"has changed since that run (recorded {str(recorded)[:12]}, now "
+            f"{current[:12]}). Rebuilt contexts would not be what the model saw."
+        )
+        sys.exit(1)
     print(f"Rebuilding retrieved contexts for {os.path.basename(path)} ...")
     records = export(path)
     write(records, path)

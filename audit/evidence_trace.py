@@ -35,13 +35,37 @@ REDACTION_PATTERNS = [
 PREVIEW_CHARS = 160
 
 
+def _passes_luhn(digits: str) -> bool:
+    """The checksum every real payment card number satisfies."""
+    total = 0
+    for position, char in enumerate(reversed(digits)):
+        value = int(char)
+        if position % 2:
+            value *= 2
+            if value > 9:
+                value -= 9
+        total += value
+    return total % 10 == 0
+
+
+def _redact_card(match: "re.Match") -> str:
+    # Sixteen digits in groups of four also describes a run of years such as
+    # "2019-2020-2021-2022", which would be lost from the trace. Only a
+    # sequence that passes the card checksum is treated as a card number.
+    digits = re.sub(r"\D", "", match.group(0))
+    return "[REDACTED:card]" if _passes_luhn(digits) else match.group(0)
+
+
 def redact(text: str) -> str:
     """Replace sensitive identifiers with a typed placeholder."""
     if not text:
         return text
     cleaned = text
     for label, pattern in REDACTION_PATTERNS:
-        cleaned = pattern.sub(f"[REDACTED:{label}]", cleaned)
+        if label == "card":
+            cleaned = pattern.sub(_redact_card, cleaned)
+        else:
+            cleaned = pattern.sub(f"[REDACTED:{label}]", cleaned)
     return cleaned
 
 

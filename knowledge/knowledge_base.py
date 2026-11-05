@@ -1,8 +1,10 @@
 import os
 import glob
 import json
+import hashlib
 from typing import List, Dict, Any
 from utils.logger import logger_instance
+from utils import run_config
 from knowledge.vector_store import VectorStore, KNOWLEDGE_COLLECTION
 from dotenv import load_dotenv
 
@@ -12,6 +14,30 @@ load_dotenv()
 # ignores headings and is the baseline it gets compared against.
 SECTION_AWARE = "section_aware"
 FIXED_SIZE = "fixed"
+
+# Short names the API and the evaluation defaults use, mapped to corpus files.
+# The UI sends each file's own heading, which is matched directly.
+STANDARD_ALIASES = {
+    "iso 27001": "iso_27001.md",
+    "iso 22301": "iso_22301.md",
+    "iso 31000": "iso_31000.md",
+    "soc 2": "soc2.md",
+    "gdpr": "gdpr.md",
+    "nist csf": "nist_csf.md",
+    "pci dss": "pci_dss.md",
+    "sbp regulations": "sbp_regulations.md",
+    "fatf": "fatf_guidelines.md",
+    "secp guidelines": "secp_guidelines.md",
+    "pakistan aml/cft": "pakistan_aml_cft.md",
+    "peca 2016": "peca_2016.md",
+    "basel": "basel_framework.md",
+    "basel iii/iv": "basel_framework.md",
+    "cobit": "cobit.md",
+    "csa ccm": "csa_ccm.md",
+    "hipaa": "hipaa.md",
+    "psd2": "psd2_open_banking.md",
+    "swift csp": "swift_csp.md",
+}
 
 
 class KnowledgeBase:
@@ -62,6 +88,38 @@ class KnowledgeBase:
         entry = self.provenance.get(filename, {})
         wanted = ("authority", "jurisdiction", "version", "effective_date")
         return {key: entry[key] for key in wanted if entry.get(key)}
+
+    def index_fingerprint(self) -> str:
+        """Identify everything that determines the stored index.
+
+        The corpus hash covers file contents only, so a change to chunk
+        settings, the embedding model, a file name or the provenance manifest
+        left the old index in place. Kept separate from run_config.hash_corpus,
+        which run manifests record as the corpus identifier.
+        """
+        files = sorted(
+            os.path.basename(p)
+            for p in glob.glob(os.path.join(self.knowledge_path, "*.md"))
+            + glob.glob(os.path.join(self.knowledge_path, "*.txt"))
+        )
+        manifest_path = os.path.join(self.knowledge_path, "corpus_manifest.json")
+        manifest_hash = ""
+        if os.path.exists(manifest_path):
+            with open(manifest_path, "rb") as f:
+                manifest_hash = hashlib.sha256(f.read()).hexdigest()
+
+        parts = {
+            "corpus_sha256": run_config.hash_corpus(self.knowledge_path),
+            "files": files,
+            "manifest_sha256": manifest_hash,
+            "chunk_strategy": self.chunk_strategy,
+            "chunk_size": self.chunk_size,
+            "chunk_overlap": self.chunk_overlap,
+            "embedding_model": run_config.embedding_model(),
+            "collection": self.collection_name,
+        }
+        canonical = json.dumps(parts, sort_keys=True)
+        return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
     def is_populated(self) -> bool:
         """Check if this knowledge collection already has documents loaded."""
@@ -118,15 +176,12 @@ class KnowledgeBase:
                 self.logger.error(f"  Error processing {filename}: {e}")
 
         if all_chunks:
-            batch_size = 50
-            for start in range(0, len(all_chunks), batch_size):
-                end = start + batch_size
-                self.vector_store.add_knowledge_documents(
-                    documents=all_chunks[start:end],
-                    metadatas=all_metadatas[start:end],
-                    ids=all_ids[start:end],
-                    collection_name=self.collection_name,
-                )
+            self.vector_store.replace_knowledge_collection(
+                documents=all_chunks,
+                metadatas=all_metadatas,
+                ids=all_ids,
+                collection_name=self.collection_name,
+            )
 
             self.logger.info(
                 f"Knowledge base ingestion complete: "
@@ -187,6 +242,8 @@ class KnowledgeBase:
         if current_lines:
             sections.append((current_section, "\n".join(current_lines)))
 
+        sections = self._merge_heading_only_sections(sections)
+
         # Chunk each section
         for section_name, section_text in sections:
             section_chunks = self._split_text(
@@ -206,6 +263,36 @@ class KnowledgeBase:
 
         return chunks
 
+    @staticmethod
+    def _merge_heading_only_sections(sections):
+        """Fold a section with no body text into the section after it.
+
+        A document title followed directly by "## Overview" became a chunk of
+        one heading line. Those chunks named the standard, so they ranked
+        highly on general queries and took retrieval slots from real content.
+        The heading text is kept, prepended to the next section.
+        """
+        def has_body(text):
+            return any(
+                line.strip() and not line.lstrip().startswith("#")
+                for line in text.split("\n")
+            )
+
+        merged = []
+        carry, carry_name = "", None
+        for name, text in sections:
+            if carry:
+                text = f"{carry}\n{text}"
+            if not has_body(text):
+                carry, carry_name = text, carry_name or name
+                continue
+            merged.append((name, text))
+            carry, carry_name = "", None
+
+        if carry:
+            merged.append((carry_name, carry))
+        return merged
+
     def _split_text(
         self, text: str, chunk_size: int, overlap: int
     ) -> List[str]:
@@ -220,6 +307,10 @@ class KnowledgeBase:
             end = start + chunk_size
             chunk = " ".join(words[start:end])
             chunks.append(chunk)
+            # Stop once the last word is covered, or the step back by the
+            # overlap emits a tail chunk already inside this one.
+            if end >= len(words):
+                break
             start = end - overlap
 
         return chunks
@@ -257,6 +348,27 @@ class KnowledgeBase:
                 self.logger.warning(f"Could not read {filename}: {e}")
 
         return standards
+
+    def resolve_standard_source(self, name: str):
+        """Corpus file for a standard name, or None if it cannot be identified.
+
+        Accepts a file's own heading (what the UI sends), its manifest title,
+        its file name, or a known short name such as "ISO 27001".
+        """
+        key = " ".join((name or "").split()).lower()
+        if not key:
+            return None
+
+        known = {s["filename"]: s["title"] for s in self.list_standards()}
+        for filename, title in known.items():
+            stem = os.path.splitext(filename)[0].replace("_", " ")
+            manifest_title = self.provenance.get(filename, {}).get("title") or ""
+            candidates = {title, manifest_title, filename, stem}
+            if key in {" ".join(c.split()).lower() for c in candidates if c}:
+                return filename
+
+        alias = STANDARD_ALIASES.get(key)
+        return alias if alias in known else None
 
     def get_status(self) -> Dict[str, Any]:
         """Return current status of the knowledge base."""

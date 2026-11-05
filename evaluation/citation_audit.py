@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from evaluation import citation_validator
 from evaluation.ablation_eval import CONDITIONS, build_context
+from evaluation.export_contexts import corpus_check
 from knowledge.rag_pipeline import RAGPipeline
 
 
@@ -56,21 +57,31 @@ def default_csv():
 def stored_contexts(csv_path):
     """Map (question_id, condition) to the context recorded for that run.
 
-    Returns an empty map when no export sits alongside the run, in which case
-    the caller falls back to rebuilding.
+    Only an export made from this run's CSV is used. Taking the newest export
+    regardless meant auditing one run against another run's contexts, and
+    rebuilding everything it lacked. Returns an empty map when there is none.
     """
+    wanted = os.path.basename(csv_path)
     exports = sorted(glob.glob("evaluation/results/retrieved_contexts_*.jsonl"))
-    if not exports:
+    matching = []
+    for export_path in exports:
+        meta_path = export_path.replace(".jsonl", "_manifest.json")
+        if not os.path.exists(meta_path):
+            continue
+        with open(meta_path, encoding="utf-8") as f:
+            if json.load(f).get("source_csv") == wanted:
+                matching.append(export_path)
+    if not matching:
         return {}
 
     contexts = {}
-    for line in open(exports[-1], encoding="utf-8"):
+    for line in open(matching[-1], encoding="utf-8"):
         record = json.loads(line)
         contexts[(record["question_id"], record["condition"])] = record.get(
             "retrieved_context", ""
         )
     if contexts:
-        print(f"Using recorded contexts from {os.path.basename(exports[-1])}")
+        print(f"Using recorded contexts from {os.path.basename(matching[-1])}")
     return contexts
 
 
@@ -78,6 +89,17 @@ def audit(path):
     rows = list(csv.DictReader(open(path, encoding="utf-8")))
     rows = [r for r in rows if r.get("answer") and not r["answer"].startswith("ERROR")]
     recorded = stored_contexts(path)
+
+    missing = {(r["question_id"], r["condition"]) for r in rows} - set(recorded)
+    if missing:
+        matches, stored_hash, current = corpus_check(path)
+        if not matches:
+            raise SystemExit(
+                f"{len(missing)} context(s) for {os.path.basename(path)} are not in a "
+                f"recorded export, and the corpus has changed since that run "
+                f"(recorded {str(stored_hash)[:12]}, now {current[:12]}). Rebuilding "
+                "them would audit answers against text the model never saw."
+            )
     rag = None
     rebuilt = 0
 

@@ -199,6 +199,10 @@ def _answer_with_planner(question, context):
     )
     plan = Planner().create_plan(perception, rag_context=context)
     result = Executor().execute_plan(plan, rag_context=context)
+    # A failed step is an infrastructure failure, not an answer to be judged.
+    # Raising records the row as an error, as for the other conditions.
+    if not result.success:
+        raise RuntimeError(result.error or "planner execution failed")
     return result.result.strip()
 
 

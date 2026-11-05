@@ -1,9 +1,15 @@
 import os
+import re
 import json
 import uuid
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from utils.logger import logger_instance
+
+# Report ids are generated as the first 8 hex characters of a UUID. Anything
+# else is rejected before it reaches a path: on Windows a backslash in the id
+# is a path separator, so "..\..\users" would resolve outside the reports dir.
+_REPORT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 
 
 class ReportStore:
@@ -21,8 +27,12 @@ class ReportStore:
         standards: List[str],
         industry: str = "",
         country: str = "",
+        trace_id: str = "",
     ) -> Dict[str, Any]:
-        """Save an evaluation report and return its metadata."""
+        """Save an evaluation report and return its metadata.
+
+        trace_id links the report to the evidence trace it was built from.
+        """
         report_id = str(uuid.uuid4())[:8]
         timestamp = datetime.now().isoformat()
 
@@ -33,6 +43,7 @@ class ReportStore:
             "standards": standards,
             "industry": industry,
             "country": country,
+            "trace_id": trace_id,
             "report_text": report_text,
         }
 
@@ -79,10 +90,20 @@ class ReportStore:
         reports.sort(key=lambda r: r["timestamp"], reverse=True)
         return reports
 
+    def _report_path(self, user_id: str, report_id: str) -> Optional[str]:
+        """Path of a report file, or None if the id could point anywhere else."""
+        if not isinstance(report_id, str) or not _REPORT_ID.match(report_id):
+            return None
+        user_dir = os.path.realpath(os.path.join(self.reports_dir, user_id))
+        filepath = os.path.realpath(os.path.join(user_dir, f"{report_id}.json"))
+        if os.path.dirname(filepath) != user_dir:
+            return None
+        return filepath
+
     def get_report(self, user_id: str, report_id: str) -> Optional[Dict[str, Any]]:
         """Retrieve a specific report including full text, or None if not found."""
-        filepath = os.path.join(self.reports_dir, user_id, f"{report_id}.json")
-        if not os.path.exists(filepath):
+        filepath = self._report_path(user_id, report_id)
+        if not filepath or not os.path.exists(filepath):
             return None
 
         with open(filepath, "r", encoding="utf-8") as f:
@@ -90,8 +111,8 @@ class ReportStore:
 
     def delete_report(self, user_id: str, report_id: str) -> bool:
         """Delete a report. Returns True if found and deleted."""
-        filepath = os.path.join(self.reports_dir, user_id, f"{report_id}.json")
-        if os.path.exists(filepath):
+        filepath = self._report_path(user_id, report_id)
+        if filepath and os.path.exists(filepath):
             os.remove(filepath)
             self.logger.info(f"Deleted report {report_id} for user {user_id}")
             return True

@@ -125,5 +125,110 @@ class TestRestoreAfterRestart(_MemoryTestCase):
         self.assertEqual(memory.get_conversation_history(user_id="analyst"), [])
 
 
+class TestDurability(_MemoryTestCase):
+
+    def test_interaction_survives_a_crash_before_shutdown(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("asked before the crash", "a", user_id="analyst")
+        # No end_current_session: the process died.
+
+        restored = self.restart()
+        history = restored.get_conversation_history(user_id="analyst")
+        self.assertEqual([h["query"] for h in history], ["asked before the crash"])
+
+    def test_recovered_session_is_not_duplicated_on_later_restarts(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("q", "a", user_id="analyst")
+        self.restart()
+        third = self.restart()
+        self.assertEqual(len(third.get_conversation_history(user_id="analyst")), 1)
+
+    def test_clean_shutdown_does_not_duplicate_history(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("q", "a", user_id="analyst")
+        memory.end_current_session()
+        restored = self.restart()
+        self.assertEqual(len(restored.get_conversation_history(user_id="analyst")), 1)
+
+
+class TestConcurrentSaves(_MemoryTestCase):
+
+    def test_parallel_chats_never_fail_a_save_or_lose_an_interaction(self):
+        import threading
+        from unittest import mock
+
+        memory = Memory(memory_file=self.path)
+
+        def chat(user):
+            for i in range(25):
+                memory.add_interaction(f"{user} q{i}", "a" * 1000, user_id=user)
+
+        with mock.patch.object(memory.logger, "error") as logged_error:
+            threads = [threading.Thread(target=chat, args=(f"u{n}",)) for n in range(5)]
+            for t in threads:
+                t.start()
+            for t in threads:
+                t.join()
+        logged_error.assert_not_called()
+
+        with open(self.path, encoding="utf-8") as f:
+            self.assertEqual(len(json.load(f)["current_session"]), 125)
+
+
+class TestReset(_MemoryTestCase):
+
+    def test_reset_holds_across_a_restart(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("before reset", "a", user_id="analyst")
+        memory.end_current_session()
+        memory.clear_user_conversation("analyst")
+
+        restored = self.restart()
+        self.assertEqual(restored.get_conversation_history(user_id="analyst"), [])
+
+    def test_history_after_a_reset_is_kept(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("before reset", "a", user_id="analyst")
+        memory.clear_user_conversation("analyst")
+        memory.add_interaction("after reset", "a", user_id="analyst")
+
+        restored = self.restart()
+        history = restored.get_conversation_history(user_id="analyst")
+        self.assertEqual([h["query"] for h in history], ["after reset"])
+
+    def test_message_in_the_same_clock_tick_as_the_reset_is_kept(self):
+        # Windows' clock can give a reset and the next message one timestamp.
+        from datetime import datetime as real_datetime
+        from unittest import mock
+
+        frozen = real_datetime(2026, 11, 4, 12, 0, 0)
+
+        class FrozenClock(real_datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return frozen
+
+        with mock.patch("agent.memory.datetime", FrozenClock):
+            memory = Memory(memory_file=self.path)
+            memory.add_interaction("before reset", "a", user_id="analyst")
+            memory.clear_user_conversation("analyst")
+            memory.add_interaction("same tick, after reset", "a", user_id="analyst")
+            restored = self.restart()
+
+        history = restored.get_conversation_history(user_id="analyst")
+        self.assertEqual([h["query"] for h in history], ["same tick, after reset"])
+
+    def test_reset_leaves_other_users_alone(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("analyst q", "a", user_id="analyst")
+        memory.add_interaction("auditor q", "a", user_id="auditor")
+        memory.clear_user_conversation("analyst")
+
+        self.assertEqual(len(memory.get_conversation_history(user_id="auditor")), 1)
+        restored = self.restart()
+        self.assertEqual(len(restored.get_conversation_history(user_id="auditor")), 1)
+        self.assertEqual(restored.get_conversation_history(user_id="analyst"), [])
+
+
 if __name__ == "__main__":
     unittest.main()

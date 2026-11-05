@@ -2,7 +2,7 @@ import os
 from pydantic import BaseModel
 from litellm import completion
 from dotenv import load_dotenv
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from utils.logger import logger_instance
 from utils import run_config
 
@@ -12,7 +12,7 @@ load_dotenv()
 class ExecutionResult(BaseModel):
     success: bool
     result: Any
-    error: str = None
+    error: Optional[str] = None
     step_results: List[Dict[str, Any]] = []
 
 
@@ -39,6 +39,7 @@ class Executor:
 
         step_results = []
         overall_success = True
+        errors = []
 
         for step in plan.steps:
             if verbose:
@@ -51,11 +52,27 @@ class Executor:
                 self.logger.error(error_msg)
                 step_results.append({"step_number": step.step_number, "success": False, "error": error_msg})
                 overall_success = False
+                errors.append(error_msg)
                 continue
 
-            result_text = self._execute_with_llm(
-                step, step_results, rag_context, conversation_context
-            )
+            # A failed call is recorded as a failed step. Returning the error as
+            # step text used to mark it successful and feed it into the answer.
+            try:
+                result_text = self._execute_with_llm(
+                    step, step_results, rag_context, conversation_context
+                )
+            except Exception as e:
+                error_msg = f"Step {step.step_number} failed: {e}"
+                self.logger.error(error_msg)
+                step_results.append({"step_number": step.step_number, "success": False, "error": error_msg})
+                overall_success = False
+                errors.append(error_msg)
+                if verbose:
+                    # The verbose log is shown in the browser; the provider's
+                    # error text, which can include part of the API key, is not.
+                    print(f"[EXECUTOR] Step {step.step_number} failed (details in the server log)")
+                continue
+
             step_results.append({"step_number": step.step_number, "success": True, "result": result_text})
 
             if verbose:
@@ -73,6 +90,7 @@ class Executor:
         return ExecutionResult(
             success=overall_success,
             result=final_result,
+            error="; ".join(errors) or None,
             step_results=step_results,
         )
 
@@ -116,20 +134,17 @@ Provide clear, specific, and actionable results. Citation rules:
 - Every requirement or control you mention must include its identifier exactly as it appears in the reference material (e.g. the clause number, article number, control ID, or section reference).
 - If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one."""
 
-        try:
-            response = completion(
-                model=self.model_config["model"],
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": f"{prior_context}\nTask: {step.description}"},
-                ],
-                temperature=self.model_config["temperature"],
-                max_tokens=self.model_config["max_tokens"],
-                seed=run_config.seed(),
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            return f"Error executing step: {str(e)}"
+        response = completion(
+            model=self.model_config["model"],
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"{prior_context}\nTask: {step.description}"},
+            ],
+            temperature=self.model_config["temperature"],
+            max_tokens=self.model_config["max_tokens"],
+            seed=run_config.seed(),
+        )
+        return response.choices[0].message.content.strip()
 
     def _dependencies_met(self, step, completed_steps: List[Dict]) -> bool:
         """Check that all declared step dependencies have already succeeded."""

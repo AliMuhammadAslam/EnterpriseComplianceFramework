@@ -53,16 +53,21 @@ class AgentCLI:
                 print("Agent: Processing request...")
                 result = self.orchestrator.run(user_input, verbose=verbose_mode, user_id="cli_user")
                 
-                if result.success:
+                if result.strategy_used == "error":
+                    print(f"Error: {result.result}")
+                    if result.error:
+                        print(f"   Details: {result.error}")
+                else:
+                    # A plan with a failed step still returns an answer built
+                    # from the steps that worked; show it as one, then say
+                    # what failed, rather than labelling the answer an error.
                     print(f"Agent: {result.result}")
+                    if result.error:
+                        print(f"   Note: part of this request failed: {result.error}")
                     if result.strategy_used == "plan_and_execute":
                         print(f"   (Used {result.strategy_used} strategy with {result.steps_executed} steps)")
                     else:
                         print(f"   (Used {result.strategy_used} strategy)")
-                else:
-                    print(f"Error: {result.result}")
-                    if result.error:
-                        print(f"   Details: {result.error}")
                         
             except KeyboardInterrupt:
                 self.orchestrator.memory.end_current_session()
@@ -75,6 +80,9 @@ class AgentCLI:
     def batch_mode(self, query: str, verbose: bool = False) -> str:
         try:
             result = self.orchestrator.run(query, verbose=verbose)
+            # Without this a partial failure printed only the partial answer.
+            if result.error:
+                return f"{result.result}\n\nNote: part of this request failed: {result.error}"
             return result.result
         except Exception as e:
             error_msg = f"Error processing query: {str(e)}"

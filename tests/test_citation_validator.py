@@ -365,5 +365,64 @@ class TestSubClauseGranularity(unittest.TestCase):
         )
 
 
+class TestWholeIdentifierMatching(unittest.TestCase):
+    """A shorter identifier must not be found inside a longer one.
+
+    The validator once used a plain substring search, so "Article 1" was
+    counted as supported by a context that only contained "Article 17".
+    """
+
+    LONGER_ONLY = (
+        "Chunk 1 [Source: mixed.md]:\n"
+        "Article 17 right to erasure. A.5.10 acceptable use. Section 30 offence. "
+        "A fine up to PKR 500,000 applies. Requirement 10 covers logging. "
+        "Clause 61 is unrelated.\n"
+    )
+
+    def test_shorter_identifiers_are_not_found_inside_longer_ones(self):
+        report = cv.validate(
+            "See Article 1, A.5.1, Section 3, PKR 5, PKR 50,000, "
+            "Requirement 1 and Clause 6.",
+            regulatory_context=self.LONGER_ONLY,
+        )
+        self.assertEqual(report.total, 7)
+        self.assertEqual(
+            [c.text for c in report.supported], [],
+            "an identifier only present as a prefix of a longer one was counted as supported",
+        )
+
+    def test_exact_identifiers_still_match(self):
+        report = cv.validate(
+            "See Article 17, A.5.10, Section 30, PKR 500,000 and Requirement 10.",
+            regulatory_context=self.LONGER_ONLY,
+        )
+        self.assertEqual(len(report.supported), 5)
+
+    def test_identifier_followed_by_punctuation_matches(self):
+        context = "Chunk 1 [Source: iso.md]:\nControls A.5.1, A.5.2; and Article 32.\n"
+        report = cv.validate("Per A.5.1 and Article 32.", regulatory_context=context)
+        self.assertEqual(len(report.supported), 2)
+
+    def test_parent_of_a_dotted_requirement_still_matches(self):
+        context = "Chunk 1 [Source: pci.md]:\nRequirement 3.4 renders PAN unreadable.\n"
+        report = cv.validate("Requirement 3 covers stored data.", regulatory_context=context)
+        self.assertTrue(report.citations[0].supported)
+
+    def test_identifier_inside_a_longer_token_does_not_match(self):
+        context = "Chunk 1 [Source: x.md]:\nThe schema.5.1 field is unrelated.\n"
+        report = cv.validate("See A.5.1.", regulatory_context=context)
+        self.assertFalse(report.citations[0].supported)
+
+    def test_company_side_uses_whole_identifier_matching_too(self):
+        company = "Chunk 1 [Source: policy.pdf]:\nOur limit is PKR 4,750,000.\n"
+        report = cv.validate(
+            "The limit is PKR 4,750.",
+            regulatory_context=CONTEXT,
+            company_context=company,
+        )
+        self.assertFalse(report.escalation_required)
+        self.assertEqual(len(report.untrusted_attributions), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
