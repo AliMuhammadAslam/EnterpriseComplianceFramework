@@ -347,6 +347,8 @@
         .btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); }
         .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
 
+        .eval-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+
         /* Audit log panel */
         .audit-log-list { max-height: 200px; overflow-y: auto; }
 
@@ -682,6 +684,10 @@
             animation: typingBounce 1.4s ease infinite;
         }
 
+        .typing-label { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem; }
+
+        .report-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+
         .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
 
@@ -769,7 +775,7 @@
 
         .toast.success { background: var(--success); color: white; }
         .toast.error { background: var(--error); color: white; }
-        .toast.info { background: var(--warning); color: white; }
+        .toast.info { background: var(--accent); color: white; }
 
         .info-card {
             display: block;
@@ -1038,7 +1044,7 @@
         .risk-high     { background:#fff1e6; color:#c0531c; border:1px solid #ffd1b3; }
         .risk-medium   { background:#fff8e1; color:#8a6d00; border:1px solid #ffe7a3; }
         .risk-low      { background:#e9f7ef; color:#1e7e44; border:1px solid #bfe6cd; }
-        .prio-badge    { display:inline-block; padding:0.05rem 0.5rem; border-radius:10px; font-size:0.8rem; font-weight:600; background:var(--bg-surface-alt); color:var(--text); border:1px solid var(--border); white-space:nowrap; }
+        .prio-badge    { display:inline-block; padding:0.05rem 0.5rem; border-radius:10px; font-size:0.8rem; font-weight:600; background:var(--bg-surface-alt); color:var(--text-primary); border:1px solid var(--border); white-space:nowrap; }
 
         /* Standards tooltip in report history */
         .std-tooltip-wrapper {
@@ -1148,6 +1154,9 @@
                             <button class="btn-success" onclick="runEvaluation()" id="evalButton">
                                 Run Compliance Evaluation
                             </button>
+                            <div class="eval-hint" id="evalHint" style="display:none">
+                                Upload a company document to run an evaluation.
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1235,6 +1244,7 @@
 
                 <div class="typing-indicator" id="typingIndicator">
                     <div class="typing-dots"><span></span><span></span><span></span></div>
+                    <span class="typing-label" id="typingLabel"></span>
                 </div>
 
                 <div class="chat-input-container">
@@ -1296,6 +1306,25 @@
         // ------------------------------------------------------------------
         let USER_ID = {{ user_id|tojson }};
         let _chatInFlight = false;  // guards against duplicate concurrent sends
+        let _evalInFlight = false;  // keeps the evaluate button off while a run is going
+        const KB_STANDARDS_COUNT = {{ standards_count|tojson }};
+
+        // An expired session made every request fail with 401, which showed as
+        // "Error: Authentication required" in the chat. Send the user to the
+        // login page instead; the pending promise never settles, so callers
+        // don't report an error while the page is leaving.
+        const _nativeFetch = window.fetch.bind(window);
+        window.fetch = async (...args) => {
+            const res = await _nativeFetch(...args);
+            if (res.status === 401) {
+                // Signed out: nothing to keep, so skip the running-evaluation
+                // prompt rather than offer to stay on a dead page.
+                window.removeEventListener('beforeunload', warnEvalInProgress);
+                window.location.href = '/login';
+                return new Promise(() => {});
+            }
+            return res;
+        };
 
         // Default-checked standards for fintech / Pakistan context. Matched by
         // file name: the grid shows each file's full heading, which never
@@ -1430,8 +1459,11 @@
         // Welcome message
         // ------------------------------------------------------------------
         function showWelcomeMessage(name) {
+            const coverage = KB_STANDARDS_COUNT > 0
+                ? `**${KB_STANDARDS_COUNT} standards and frameworks**`
+                : '**standards and frameworks**';
             addMessage('agent',
-                `Hello, **${name}**! Welcome to **ComplianceAI**.\n\nI'm an AI-powered compliance and governance assistant designed to help fintech organisations operating in Pakistan stay on top of regulatory requirements. I'm backed by a knowledge base covering **18 standards and frameworks** including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, SBP Regulations, SECP Guidelines, FATF, Basel III/IV, and more.\n\nHere's how I can help you:\n- Answer questions on compliance standards, regulations, and best practices\n- Analyse your uploaded company documents against regulatory requirements\n- Run structured compliance evaluations and generate gap analysis reports\n- Maintain a full audit trail of all actions for accountability\n\nHow can I assist you today?`
+                `Hello, **${name}**! Welcome to **ComplianceAI**.\n\nI'm an AI-powered compliance and governance assistant designed to help fintech organisations operating in Pakistan stay on top of regulatory requirements. I'm backed by a knowledge base covering ${coverage} including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, SBP Regulations, SECP Guidelines, FATF, Basel III/IV, and more.\n\nHere's how I can help you:\n- Answer questions on compliance standards, regulations, and best practices\n- Analyse your uploaded company documents against regulatory requirements\n- Run structured compliance evaluations and generate gap analysis reports\n- Maintain a full audit trail of all actions for accountability\n\nHow can I assist you today?`
             );
         }
 
@@ -1524,6 +1556,7 @@
         async function loadDocuments() {
             try {
                 const res = await fetch(`/documents?user_id=${USER_ID}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 const list = document.getElementById('docList');
                 const healthDocs = document.getElementById('healthDocs');
@@ -1541,7 +1574,19 @@
                         <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete">✕</button>`;
                     list.appendChild(div);
                 });
+                // Only after a successful load: a failed request says nothing
+                // about how many documents there are.
+                updateEvalButtonState();
             } catch (e) { console.error('Error loading documents:', e); }
+        }
+
+        // With no documents the server can only answer "upload first", so
+        // say that up front instead of after a click.
+        function updateEvalButtonState() {
+            if (_evalInFlight) return;
+            const hasDocs = getTotalDocCount() > 0;
+            document.getElementById('evalButton').disabled = !hasDocs;
+            document.getElementById('evalHint').style.display = hasDocs ? 'none' : 'block';
         }
 
         function uploadFile(input) { if (input.files.length > 0) uploadFileObj(input.files[0]); }
@@ -1626,8 +1671,22 @@
             }
 
             const btn = document.getElementById('evalButton');
+            _evalInFlight = true;
             btn.disabled = true;
-            btn.textContent = 'Evaluating...';
+
+            // A run takes minutes with no other sign of life, so show the
+            // elapsed time and warn before the page is closed or reloaded.
+            const startedAt = Date.now();
+            const typingLabel = document.getElementById('typingLabel');
+            const tick = () => {
+                const secs = Math.floor((Date.now() - startedAt) / 1000);
+                const elapsed = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+                btn.textContent = `Evaluating... ${elapsed}`;
+                typingLabel.textContent = `Running evaluation (${elapsed}). This can take a few minutes.`;
+            };
+            tick();
+            const timer = setInterval(tick, 1000);
+            window.addEventListener('beforeunload', warnEvalInProgress);
 
             const docLabel = totalDocs > 0 ? `, ${docIds.length}/${totalDocs} document(s)` : '';
             addMessage('user', `Run compliance evaluation against ${standards.length} standard(s)${docLabel} - Fintech / Pakistan`);
@@ -1668,7 +1727,13 @@
                     addMessage('agent', `**Error:** ${data.error}`);
                     showToast(data.error, 'error');
                 } else {
-                    addMessage('agent', data.report);
+                    const msg = addMessage('agent', data.report);
+                    if (data.report_id) {
+                        addReportActions(msg, data.report_id, {
+                            timestamp: data.timestamp,
+                            standards: data.standards_evaluated,
+                        });
+                    }
                     showToast(`Evaluation complete - Report ID: ${data.report_id}`, 'success');
                     loadReports();
                     if (data.logs) displayLogs(data.logs);
@@ -1680,8 +1745,34 @@
                 showToast(`Evaluation failed: ${e.message}`, 'error');
             }
 
-            btn.disabled = false;
+            clearInterval(timer);
+            typingLabel.textContent = '';
+            window.removeEventListener('beforeunload', warnEvalInProgress);
+            _evalInFlight = false;
             btn.textContent = 'Run Compliance Evaluation';
+            btn.disabled = false;
+            updateEvalButtonState();
+        }
+
+        function warnEvalInProgress(event) {
+            event.preventDefault();
+            event.returnValue = '';  // older browsers need this to show the prompt
+        }
+
+        // The saved report is otherwise only reachable through Report History.
+        function addReportActions(messageEl, reportId, meta) {
+            const actions = document.createElement('div');
+            actions.className = 'report-actions';
+            const openBtn = document.createElement('button');
+            openBtn.className = 'btn-modal-download';
+            openBtn.textContent = 'Open report';
+            openBtn.addEventListener('click', () => viewReport(reportId, meta));
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'btn-modal-download';
+            downloadBtn.textContent = '📥 Download (.md)';
+            downloadBtn.addEventListener('click', () => downloadReport(reportId));
+            actions.append(openBtn, downloadBtn);
+            messageEl.querySelector('.msg-bubble').appendChild(actions);
         }
 
         // ------------------------------------------------------------------
@@ -1932,6 +2023,7 @@
                 <div class="msg-time">${timeStr}</div>`;
             container.appendChild(div);
             container.scrollTop = container.scrollHeight;
+            return div;
         }
 
         function renderMarkdown(text) {
@@ -1982,10 +2074,14 @@
             });
 
             // Tables
+            // Strip only the outer pipes: dropping every blank piece also
+            // dropped empty cells, which moved later cells under the wrong
+            // column.
+            const splitRow = row => row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
             html = html.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)*)/g, (_, header, body) => {
-                const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+                const ths = splitRow(`|${header}|`).map(c => `<th>${c}</th>`).join('');
                 const rows = body.trim().split('\n').map(row => {
-                    const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+                    const tds = splitRow(row).map(c => `<td>${c}</td>`).join('');
                     return `<tr>${tds}</tr>`;
                 }).join('');
                 return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;

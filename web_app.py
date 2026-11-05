@@ -239,6 +239,7 @@ def index():
         user_name=session.get("name", ""),
         user_role=session.get("role", ""),
         username=session.get("username", ""),
+        standards_count=len(orchestrator.knowledge_base.list_standards()),
     )
 
 
@@ -511,6 +512,7 @@ def evaluate_compliance():
         return jsonify({
             "report": report,
             "report_id": report_meta.get("report_id"),
+            "timestamp": report_meta.get("timestamp"),
             "trace_id": trace_id,
             "standards_evaluated": evaluated_standards,
             "industry": industry,
