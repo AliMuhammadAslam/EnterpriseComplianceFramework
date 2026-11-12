@@ -304,7 +304,7 @@ Both default to the development run that the reported tables come from and name 
 python -m unittest discover -s tests
 ```
 
-266 tests across nineteen files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
+291 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
 
 ---
 
@@ -437,7 +437,7 @@ Optional flags:
 ## Using the Web Interface
 
 ### Chat
-Ask any compliance-related question in the chat panel. The agent retrieves relevant regulatory context and your uploaded company documents before responding.
+Ask any compliance-related question in the chat panel. The agent retrieves relevant regulatory context and your uploaded company documents before responding. Your recent conversation is shown again after a page reload, until you reset the session, and each answer has a **Copy** link that copies it as Markdown.
 
 **Example queries:**
 - *What are the key requirements of GDPR Article 32?*
@@ -445,7 +445,7 @@ Ask any compliance-related question in the chat panel. The agent retrieves relev
 - *What controls does ISO 27001 require for access management?*
 
 ### Document Upload
-Drag and drop, or click to browse, a company document (PDF, DOCX, or TXT, max 50 MB) into the upload panel. DOCX tables are read along with the paragraphs, in document order. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
+Drag and drop, or click to browse, one or more company documents (PDF, DOCX, or TXT, max 50 MB each) into the upload panel; several files are uploaded one after another, each with its own result. DOCX tables are read along with the paragraphs, in document order. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
 
 Uploaded files are treated as untrusted input. The filename is reduced to a bare basename before it touches any path, which closes a directory traversal issue found during testing where a crafted filename could write outside the user's own upload folder. The file's contents are checked against its claimed extension, so a renamed executable is rejected rather than parsed. Page count, paragraph count, and extracted character count are capped before parsing. Text inside a document that addresses the model rather than the reader is marked and left in place, since silently deleting it would hide part of the document being assessed. These checks reduce the attack surface but do not eliminate prompt injection.
 
@@ -463,6 +463,11 @@ The system retrieves your selected documents and the relevant regulatory standar
 - A regulatory risk score and prioritization table
 - Prioritised recommendations (with effort estimates)
 
+The top of each report shows a short summary counted from its own tables: how many standards had findings, documentation gaps or were not applicable, and how many gaps fall in each priority band. A report can be opened from the chat or from **Report History**, copied, downloaded as Markdown, or printed (the browser's print dialog also offers Save as PDF).
+
+### Audit Trail and Accessibility
+The **Audit Trail** panel can be filtered by action, or to failures only. The interface follows the system's light or dark setting, and can be used with the keyboard: dialogs close with Escape and keep focus inside while open, and the upload area and report list respond to Enter.
+
 ---
 
 ## REST API Reference
@@ -474,6 +479,7 @@ All data endpoints require an authenticated session. Requests without a valid se
 | `GET` / `POST` | `/login` | Show the login page (GET) or authenticate a username and password (POST) |
 | `POST` | `/logout` | Clear the session |
 | `POST` | `/chat` | Send a message; body: `{message, verbose}` |
+| `GET` | `/chat/history` | The current user's recent chat exchanges (up to 50), oldest first |
 | `POST` | `/upload` | Upload a document; multipart form: `file` |
 | `GET` | `/documents` | List documents uploaded by the current user |
 | `DELETE` | `/documents/<doc_id>` | Delete a specific document and its vector chunks |

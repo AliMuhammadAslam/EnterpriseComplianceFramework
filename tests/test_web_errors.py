@@ -157,5 +157,57 @@ class TestRequestSize(_WebAppCase):
         self.assertNotEqual(r.status_code, 413)
 
 
+class TestPageAndHistory(_WebAppCase):
+
+    def test_main_page_renders_for_a_signed_in_user(self):
+        r = self.client.get("/")
+        self.assertEqual(r.status_code, 200)
+        self.assertIn(b"KB_STANDARDS_COUNT = 0", r.data)
+
+    def test_chat_history_returns_only_this_users_exchanges(self):
+        memory = self.web_app.orchestrator.memory
+        memory.add_interaction("mine", "answer", user_id="default")
+        memory.add_interaction("theirs", "answer", user_id="someone_else")
+        r = self.client.get("/chat/history")
+        self.assertEqual(r.status_code, 200)
+        queries = [h["query"] for h in r.get_json()["history"]]
+        self.assertIn("mine", queries)
+        self.assertNotIn("theirs", queries)
+
+    def test_chat_history_needs_a_session(self):
+        r = self.web_app.app.test_client().get("/chat/history")
+        self.assertEqual(r.status_code, 401)
+
+
+class TestRejectedUploadIsAudited(_WebAppCase):
+    """A refused upload is still an attempt, and belongs in the audit trail."""
+
+    def _failures(self):
+        return self.web_app.audit.query(
+            user_id="default", action="DOCUMENT_UPLOAD", status="failure", limit=50
+        )
+
+    def test_contents_not_matching_the_extension_is_recorded(self):
+        # Allowed extension, so the extension check passes and validation
+        # rejects it on its contents instead. That path logged nothing.
+        png = io.BytesIO(b"\x89PNG\r\n\x1a\n" + b"x" * 200)
+        r = self.client.post("/upload", data={"file": (png, "picture.pdf")},
+                             content_type="multipart/form-data")
+        self.assertEqual(r.status_code, 400)
+        self.assertIn("do not match", r.get_json()["error"])
+
+        recorded = [e for e in self._failures()
+                    if e["details"].get("filename") == "picture.pdf"]
+        self.assertEqual(len(recorded), 1, "the refused upload was not audited")
+        self.assertIn("do not match", recorded[0]["details"]["rejected"])
+
+    def test_unsupported_extension_is_still_recorded(self):
+        r = self.client.post("/upload", data={"file": (io.BytesIO(b"x"), "notes.exe")},
+                             content_type="multipart/form-data")
+        self.assertEqual(r.status_code, 400)
+        self.assertTrue(any(e["details"].get("filename") == "notes.exe"
+                            for e in self._failures()))
+
+
 if __name__ == "__main__":
     unittest.main()

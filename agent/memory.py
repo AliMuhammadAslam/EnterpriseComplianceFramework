@@ -82,6 +82,28 @@ class Memory:
         recent = [e for e in entries if e.type == "interaction"][-limit:]
         return [e.content for e in recent]
 
+    def get_recent_interactions(
+        self, user_id: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """This user's latest exchanges, oldest first, with when they happened.
+
+        For redisplaying the conversation after a page reload; a reset
+        conversation is already gone from conversation_by_user.
+        """
+        with self._lock:
+            entries = [
+                e for e in self.conversation_by_user.get(user_id, [])
+                if e.type == "interaction"
+            ][-limit:]
+            return [
+                {
+                    "query": e.content.get("query", ""),
+                    "response": e.content.get("response", ""),
+                    "timestamp": e.timestamp.isoformat(),
+                }
+                for e in entries
+            ]
+
     def clear_user_conversation(self, user_id: str = "default"):
         """Clear only this user's follow-up conversation history.
 

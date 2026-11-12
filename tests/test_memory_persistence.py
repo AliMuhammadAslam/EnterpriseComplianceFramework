@@ -230,5 +230,42 @@ class TestReset(_MemoryTestCase):
         self.assertEqual(restored.get_conversation_history(user_id="analyst"), [])
 
 
+class TestRecentInteractions(_MemoryTestCase):
+    """What the web page redisplays after a reload."""
+
+    def test_returns_this_users_exchanges_oldest_first_with_times(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("q1", "a1", user_id="analyst")
+        memory.add_interaction("other", "x", user_id="auditor")
+        memory.add_interaction("q2", "a2", user_id="analyst")
+        history = memory.get_recent_interactions("analyst")
+        self.assertEqual([h["query"] for h in history], ["q1", "q2"])
+        self.assertEqual([h["response"] for h in history], ["a1", "a2"])
+        self.assertTrue(all(h["timestamp"] for h in history))
+
+    def test_limit_keeps_the_latest(self):
+        memory = Memory(memory_file=self.path)
+        for i in range(5):
+            memory.add_interaction(f"q{i}", f"a{i}", user_id="analyst")
+        history = memory.get_recent_interactions("analyst", limit=2)
+        self.assertEqual([h["query"] for h in history], ["q3", "q4"])
+
+    def test_reset_conversation_is_not_returned_even_after_a_restart(self):
+        memory = Memory(memory_file=self.path)
+        memory.add_interaction("old", "a", user_id="analyst")
+        memory.clear_user_conversation("analyst")
+        memory.add_interaction("new", "b", user_id="analyst")
+        self.assertEqual(
+            [h["query"] for h in memory.get_recent_interactions("analyst")], ["new"]
+        )
+        self.assertEqual(
+            [h["query"] for h in self.restart().get_recent_interactions("analyst")], ["new"]
+        )
+
+    def test_unknown_user_gets_nothing(self):
+        memory = Memory(memory_file=self.path)
+        self.assertEqual(memory.get_recent_interactions("nobody"), [])
+
+
 if __name__ == "__main__":
     unittest.main()

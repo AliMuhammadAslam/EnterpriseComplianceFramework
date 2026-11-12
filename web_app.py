@@ -308,15 +308,34 @@ def chat():
         return _error_response(e)
 
 
+# Exchanges redisplayed after a page reload.
+CHAT_HISTORY_LIMIT = 50
+
+
+@app.route("/chat/history", methods=["GET"])
+@login_required
+def chat_history():
+    """The signed-in user's recent chat exchanges, oldest first."""
+    try:
+        history = orchestrator.memory.get_recent_interactions(
+            _current_user_id(), limit=CHAT_HISTORY_LIMIT
+        )
+        return jsonify({"history": history})
+    except Exception as e:
+        return _error_response(e)
+
+
 @app.route("/upload", methods=["POST"])
 @login_required
 def upload_document():
     """Upload a company document (PDF, DOCX, TXT) for compliance analysis."""
+    filename = ""
     try:
         if "file" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
         file = request.files["file"]
+        filename = file.filename
         user_id = _current_user_id()
 
         if file.filename == "":
@@ -367,8 +386,30 @@ def upload_document():
                 os.remove(tmp_path)
 
     except ValueError as e:
+        # Rejected by validation: contents not matching the extension, too
+        # many pages, and so on. Only the extension check recorded a failure
+        # before, so a file rejected on its contents left no trace in the
+        # audit trail, which is exactly the attempt worth keeping.
+        audit.log(
+            action="DOCUMENT_UPLOAD",
+            user_id=_current_user_id(),
+            resource_type="document",
+            details={"filename": filename, "rejected": str(e)},
+            ip_address=_get_client_ip(),
+            status="failure",
+        )
         return jsonify({"error": str(e)}), 400
     except Exception as e:
+        audit.log(
+            action="DOCUMENT_UPLOAD",
+            user_id=_current_user_id(),
+            resource_type="document",
+            # The cause stays out of the audit trail; _error_response puts it
+            # in the server log behind a reference.
+            details={"filename": filename, "error": "unexpected failure"},
+            ip_address=_get_client_ip(),
+            status="failure",
+        )
         return _error_response(e)
 
 
