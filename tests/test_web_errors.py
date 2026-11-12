@@ -209,5 +209,32 @@ class TestRejectedUploadIsAudited(_WebAppCase):
                             for e in self._failures()))
 
 
+
+class TestExecutionLogTimes(_WebAppCase):
+    """Each execution log line shows when it happened, not when the request ended."""
+
+    def test_chat_log_lines_keep_their_own_times(self):
+        from datetime import datetime
+        from agent.orchestrator import OrchestrationResult
+        times = iter([datetime(2026, 1, 1, 9, 0, 1), datetime(2026, 1, 1, 9, 0, 5),
+                      datetime(2026, 1, 1, 9, 0, 9)])
+        clock = mock.Mock(now=lambda: next(times))
+
+        def run(*args, **kwargs):
+            print("[PLANNER] Created plan with 2 steps")
+            print("[EXECUTOR] Step 1 completed")
+            return OrchestrationResult(success=True, result="answer",
+                                       strategy_used="plan_and_execute")
+
+        with mock.patch.object(self.web_app.orchestrator, "run", side_effect=run), \
+             mock.patch("utils.output_capture.datetime", clock):
+            r = self.client.post("/chat", json={"message": "q", "verbose": True})
+
+        self.assertEqual(r.get_json()["logs"], [
+            "[09:00:01] [PLANNER] Created plan with 2 steps",
+            "[09:00:05] [EXECUTOR] Step 1 completed",
+        ])
+
+
 if __name__ == "__main__":
     unittest.main()

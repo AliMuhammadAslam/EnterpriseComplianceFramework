@@ -132,7 +132,8 @@ Use the provided reference material to give accurate, well-cited responses.
 Provide clear, specific, and actionable results. Citation rules:
 - Use ONLY the control numbers, clause numbers, article numbers, and section identifiers that appear in the provided reference material above. Do not rely on your training knowledge for specific identifiers. Standards are versioned and numbering changes between versions.
 - Every requirement or control you mention must include its identifier exactly as it appears in the reference material (e.g. the clause number, article number, control ID, or section reference).
-- If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one."""
+- If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one.
+- The "Chunk N" headings and relevance scores in the reference material are retrieval labels, not part of any document. Never cite them; name the source document and its clause, article or section instead."""
 
         response = completion(
             model=self.model_config["model"],
@@ -181,7 +182,8 @@ Write a clear, comprehensive answer that directly addresses what the user asked.
 - Structure your response with clear sections where appropriate
 - Do not mention internal processing steps
 - If the context indicates that no company documents have been uploaded, explicitly tell the user that your response is based solely on the regulatory knowledge base and that uploading company documents will enable document-specific analysis
-- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned, so do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly."""
+- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned, so do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly.
+- The "Chunk N" headings and relevance scores in the reference material are retrieval labels, not part of any document. Never cite them, and leave out any that appear in the analysis; name the source document and its clause, article or section instead."""
 
         try:
             response = completion(

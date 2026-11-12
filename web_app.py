@@ -5,7 +5,6 @@ import atexit
 import tempfile
 import uuid
 from functools import wraps
-from datetime import datetime
 
 from flask import (
     Flask, render_template, request, jsonify, session, redirect, url_for
@@ -160,6 +159,15 @@ def _error_response(exc, message="Something went wrong. Please try again."):
     return jsonify({"error": f"{message} (reference {reference})"}), 500
 
 
+def _timestamped_logs(captured) -> list:
+    """Format captured output with the time each line was written.
+
+    One time taken after the request finished used to be applied to every
+    line, so all steps of a long run showed the same second.
+    """
+    return [f"[{started:%H:%M:%S}] {text}" for started, text in captured.timed_lines()]
+
+
 def _is_list_of_names(value, max_length: int = 300) -> bool:
     """True for a list of non-empty strings of reasonable length."""
     return isinstance(value, list) and all(
@@ -265,11 +273,7 @@ def chat():
         if verbose:
             with capture_output() as captured_output:
                 result = orchestrator.run(user_message, verbose=verbose, user_id=user_id)
-            output_lines = captured_output.getvalue().split("\n")
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            for line in output_lines:
-                if line.strip():
-                    logs.append(f"[{timestamp}] {line.strip()}")
+            logs = _timestamped_logs(captured_output)
         else:
             result = orchestrator.run(user_message, verbose=False, user_id=user_id)
 
@@ -508,7 +512,6 @@ def evaluate_compliance():
                 )
             }), 200
 
-        logs = []
         with capture_output() as captured_output:
             report, trace_id = orchestrator.evaluate_compliance_traced(
                 user_id=user_id,
@@ -518,11 +521,7 @@ def evaluate_compliance():
                 doc_ids=doc_ids,
                 verbose=True,
             )
-        output_lines = captured_output.getvalue().split("\n")
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        for line in output_lines:
-            if line.strip():
-                logs.append(f"[{timestamp}] {line.strip()}")
+        logs = _timestamped_logs(captured_output)
 
         # Persist the report
         evaluated_standards = standards or list(DEFAULT_STANDARDS)

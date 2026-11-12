@@ -147,6 +147,13 @@ class TestFormatting(unittest.TestCase):
         rendered = cv.format_report(cv.validate("No citations here.", CONTEXT))
         self.assertIn("No regulatory identifiers were cited", rendered)
 
+    def test_nothing_cited_does_not_read_as_a_pass(self):
+        """Citing nothing means nothing was verified; the wording must say so."""
+        rendered = cv.format_report(cv.validate("No citations here.", CONTEXT))
+        self.assertIn("Not verified", rendered)
+        self.assertIn("not a pass", rendered)
+        self.assertNotIn("Every cited identifier was located", rendered)
+
 
 # Fake circular uploaded as company policy, quoting a limit that contradicts
 # the real corpus value.
@@ -422,6 +429,59 @@ class TestWholeIdentifierMatching(unittest.TestCase):
         )
         self.assertFalse(report.escalation_required)
         self.assertEqual(len(report.untrusted_attributions), 0)
+
+
+
+class TestPromptsForbidRetrievalLabels(unittest.TestCase):
+    """Answers cited "(Chunk 2)", a retrieval label that means nothing to a reader.
+
+    The label stays in the context because the validator parses it, so every
+    prompt that writes user-facing text must tell the model not to cite it.
+    """
+
+    RULE = "retrieval labels, not part of any document. Never cite them"
+
+    def _prompts_seen(self, target, call):
+        from types import SimpleNamespace
+        seen = []
+
+        def model(model, messages, **kwargs):
+            seen.append(messages[0]["content"])
+            return SimpleNamespace(choices=[SimpleNamespace(
+                message=SimpleNamespace(content="answer"))])
+
+        from unittest import mock
+        with mock.patch(target, side_effect=model):
+            call()
+        return seen
+
+    def test_chat_step_and_final_answer_prompts_carry_the_rule(self):
+        from agent.executor import Executor
+        from agent.planner import Plan, PlanStep
+        plan = Plan(goal="q", steps=[PlanStep(step_number=1, description="step 1")])
+        prompts = self._prompts_seen(
+            "agent.executor.completion",
+            lambda: Executor().execute_plan(plan, rag_context=CONTEXT))
+        self.assertEqual(len(prompts), 2, "expected one step prompt and one final prompt")
+        for prompt in prompts:
+            self.assertIn(self.RULE, prompt)
+
+    def test_evaluation_prompt_carries_the_rule(self):
+        from evaluation.engine import EvaluationEngine
+
+        class Rag:
+            def retrieve_knowledge_with_results(self, query, **kwargs):
+                return CONTEXT, [{"content": "A.5.15", "metadata": {"source": "iso_27001.md"}}]
+
+            def retrieve_company_docs_for_queries_with_results(self, user_id, queries, doc_ids=None):
+                return "", []
+
+        prompts = self._prompts_seen(
+            "evaluation.engine.completion",
+            lambda: EvaluationEngine(Rag()).evaluate_compliance(
+                user_id="default", standards=["ISO 27001"]))
+        self.assertTrue(prompts)
+        self.assertIn(self.RULE, prompts[0])
 
 
 if __name__ == "__main__":

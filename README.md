@@ -304,7 +304,7 @@ Both default to the development run that the reported tables come from and name 
 python -m unittest discover -s tests
 ```
 
-291 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
+298 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
 
 ---
 

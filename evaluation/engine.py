@@ -166,10 +166,13 @@ class EvaluationEngine:
             f"Citation validation: {validation.summary()}"
         )
         if verbose:
-            print(
-                f"[EVALUATION] Citation check: {len(validation.supported)}/"
-                f"{validation.total} identifiers supported"
-            )
+            if validation.total == 0:
+                print("[EVALUATION] Citation check: no identifiers cited, findings not verified")
+            else:
+                print(
+                    f"[EVALUATION] Citation check: {len(validation.supported)}/"
+                    f"{validation.total} identifiers supported"
+                )
             if validation.unsupported:
                 print(
                     f"[EVALUATION] Unsupported: "
@@ -335,6 +338,7 @@ Specific, actionable recommendations ordered by priority. For each:
 CRITICAL RULES:
 - Every standard listed under Standards to evaluate against MUST appear exactly once in the Standards Coverage section, marked as Findings, Documentation gap, or Not applicable. Never silently omit a listed standard. In the detailed sections such as Compliant Areas and Gap Analysis, only include a standard where it genuinely has compliant areas or gaps. Do not pad the report with empty subsections for standards that are Not applicable.
 - ALWAYS cite the specific clause, article, section, control ID, or requirement identifier for EVERY finding, but ONLY at the level of granularity that actually appears in the provided regulatory context below. Do not invent a more specific sub-clause, sub-section, or sub-control number than what is explicitly written in the retrieved context, even if you recall a more granular numbering scheme from general knowledge. If the retrieved context only names a top-level clause or theme, cite it at that level rather than guessing a finer subdivision.
+- The "Chunk N" headings and relevance scores in the regulatory context and company documents are retrieval labels, not part of any document. Never cite them; name the source document and its clause, article or section instead.
 - Be specific and actionable in recommendations.
 - Base your analysis ONLY on the provided company documents and regulatory context.
 - If a relevant standard has no supporting company documentation, record it as a Documentation gap in the Standards Coverage section and recommend what the company should produce. If a standard genuinely does not apply to this entity, record it as Not applicable instead of reporting a documentation gap.

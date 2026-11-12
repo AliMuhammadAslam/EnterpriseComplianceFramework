@@ -388,7 +388,15 @@ def format_report(report: ValidationReport) -> str:
         lines.append("")
 
     if report.total == 0:
-        lines.append("No regulatory identifiers were cited, so none could be checked.")
+        # Stated as a verdict: a bare "nothing to check" read as a pass, when it
+        # means no finding in the report was verified against the corpus.
+        lines.append(
+            "**Not verified.** No regulatory identifiers were cited (article, "
+            "section, clause, control or requirement numbers, or PKR amounts), "
+            "so no finding in this report could be checked against the "
+            "regulatory text. This is not a pass: confirm the findings against "
+            "the source standards before relying on them."
+        )
         lines.extend(_quotation_lines(report))
         return "\n".join(lines)
 

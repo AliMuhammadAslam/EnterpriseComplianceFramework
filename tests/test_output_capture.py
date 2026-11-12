@@ -8,6 +8,8 @@ import os
 import sys
 import threading
 import unittest
+from datetime import datetime
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -75,6 +77,42 @@ class TestThreadIsolation(unittest.TestCase):
             print("c")
         self.assertEqual(outer.getvalue(), "a\nc\n")
         self.assertEqual(inner.getvalue(), "b\n")
+
+
+
+def _clock(*seconds):
+    """A stand-in for datetime whose now() returns the given seconds in turn."""
+    times = iter(datetime(2026, 1, 1, 9, 0, s) for s in seconds)
+    return mock.Mock(now=lambda: next(times))
+
+
+class TestLineTimes(unittest.TestCase):
+    """Each line keeps the time it was written, not the time capture ended."""
+
+    def test_each_line_gets_the_time_it_was_written(self):
+        with mock.patch("utils.output_capture.datetime", _clock(1, 7)):
+            with capture_output() as buf:
+                print("planning")
+                print("executing")
+        self.assertEqual(buf.timed_lines(), [
+            (datetime(2026, 1, 1, 9, 0, 1), "planning"),
+            (datetime(2026, 1, 1, 9, 0, 7), "executing"),
+        ])
+
+    def test_a_line_written_in_pieces_is_one_line_stamped_when_it_began(self):
+        # print("step", "one") writes "step", " ", "one" and the newline separately.
+        with mock.patch("utils.output_capture.datetime", _clock(3)):
+            with capture_output() as buf:
+                print("step", "one")
+        self.assertEqual(buf.timed_lines(), [(datetime(2026, 1, 1, 9, 0, 3), "step one")])
+
+    def test_blank_lines_are_left_out_and_getvalue_is_unchanged(self):
+        with capture_output() as buf:
+            print("a")
+            print()
+            sys.stdout.write("b\n\nc\n")
+        self.assertEqual([text for _, text in buf.timed_lines()], ["a", "b", "c"])
+        self.assertEqual(buf.getvalue(), "a\n\nb\n\nc\n")
 
 
 if __name__ == "__main__":

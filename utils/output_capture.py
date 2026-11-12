@@ -11,6 +11,7 @@ import io
 import sys
 import threading
 from contextlib import contextmanager
+from datetime import datetime
 
 _local = threading.local()
 
@@ -36,6 +37,39 @@ class _ThreadRoutedStream:
         return getattr(self._fallback, name)
 
 
+class _TimedBuffer(io.StringIO):
+    """A StringIO that also records when each line began.
+
+    The routes used to stamp every captured line with one time taken after the
+    request had finished, so a long run showed the same second on every line.
+    Recording the time as each line starts gives the real time of each step.
+    getvalue() is unchanged.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self._lines = []        # [started_at, text] per line, in order
+        self._line_open = False  # True while the last line has no newline yet
+
+    def write(self, text):
+        written = super().write(text)
+        pieces = text.split("\n")
+        for i, piece in enumerate(pieces):
+            ends_line = i < len(pieces) - 1
+            if not piece and not ends_line:
+                continue  # nothing after the final newline
+            if self._line_open:
+                self._lines[-1][1] += piece
+            else:
+                self._lines.append([datetime.now(), piece])
+            self._line_open = not ends_line
+        return written
+
+    def timed_lines(self):
+        """Return (time the line began, stripped text) for each non-blank line."""
+        return [(started, text.strip()) for started, text in self._lines if text.strip()]
+
+
 _install_lock = threading.Lock()
 
 
@@ -48,10 +82,14 @@ def _install():
 
 @contextmanager
 def capture_output():
-    """Collect what this thread prints inside the block into a StringIO."""
+    """Collect what this thread prints inside the block.
+
+    Yields a StringIO; its timed_lines() gives each line with the time it was
+    written.
+    """
     _install()
     previous = getattr(_local, "buffer", None)
-    buffer = io.StringIO()
+    buffer = _TimedBuffer()
     _local.buffer = buffer
     try:
         yield buffer
