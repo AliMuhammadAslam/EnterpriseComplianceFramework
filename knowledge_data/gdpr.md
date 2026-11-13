@@ -1,10 +1,10 @@
 # GDPR — General Data Protection Regulation
 
 ## Overview
-The General Data Protection Regulation (GDPR) is a comprehensive data protection law enacted by the European Union (EU) in May 2018. It governs how organizations collect, store, process, and transfer personal data of individuals in the EU/EEA. It is considered the strongest data privacy regulation in the world.
+The General Data Protection Regulation (GDPR) is a comprehensive data protection law of the European Union (EU), Regulation (EU) 2016/679, adopted on 27 April 2016 and applicable from 25 May 2018 (Article 99). It governs how organizations collect, store, process, and transfer personal data of individuals in the EU/EEA. It is considered the strongest data privacy regulation in the world.
 
 ## Scope
-Applies to any organization that processes personal data of EU/EEA residents, regardless of where the organization is based (extraterritorial scope). Covers both data controllers (who determine purposes) and data processors (who process on behalf of controllers).
+Applies to the processing of personal data in the context of the activities of an establishment of a controller or processor in the Union, regardless of whether the processing takes place in the Union (Article 3(1)); and to processing of personal data of data subjects who are in the Union by a controller or processor not established in the Union, where the processing relates to offering goods or services to them in the Union or monitoring their behaviour within the Union (Article 3(2)). Covers both data controllers (who determine purposes) and data processors (who process on behalf of controllers).
 
 ## Key Principles (Article 5)
 
@@ -67,7 +67,7 @@ Applies to any organization that processes personal data of EU/EEA residents, re
 - Must be conducted before processing begins
 
 ### Data Protection Officer (DPO)
-- Required for public authorities, organizations conducting large-scale monitoring, or processing special categories of data
+- Required where the processing is carried out by a public authority or body (except courts acting in their judicial capacity); where the core activities of the controller or processor consist of processing operations which require regular and systematic monitoring of data subjects on a large scale; or where the core activities consist of processing on a large scale of special categories of data (Article 9) or personal data relating to criminal convictions and offences (Article 10) (Article 37(1))
 
 ### Notification of a Personal Data Breach to the Supervisory Authority (Article 33)
 - The controller must notify the competent supervisory authority without undue delay and, where feasible, not later than 72 hours after becoming aware of the breach, unless the breach is unlikely to result in a risk to the rights and freedoms of natural persons

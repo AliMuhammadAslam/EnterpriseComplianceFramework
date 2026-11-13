@@ -40,14 +40,18 @@ Applies to all countries and their financial institutions, designated non-financ
 - **R25**: Transparency of legal arrangements (trusts)
 
 ### Powers of Authorities (Recommendations 26-35)
-- **R26-R28**: FIU role, law enforcement powers, investigative authority
-- **R29**: Financial intelligence unit — operational independence, information exchange
-- **R30-R32**: Responsibilities of authorities, sanctions, statistics
-- **R33-R34**: International cooperation — mutual legal assistance, extradition
-- **R35**: Mutual legal assistance for freezing and confiscation
+- **R26**: Regulation and supervision of financial institutions
+- **R27**: Powers of supervisors
+- **R28**: Regulation and supervision of DNFBPs
+- **R29**: Financial intelligence units
+- **R30-R31**: Responsibilities and powers of law enforcement and investigative authorities
+- **R32**: Cash couriers
+- **R33**: Statistics
+- **R34**: Guidance and feedback
+- **R35**: Sanctions
 
 ### International Cooperation (Recommendations 36-40)
-- **R36-R40**: Information exchange, mutual legal assistance, extradition, other forms of cooperation
+- **R36-R40**: International instruments (R36), mutual legal assistance (R37), mutual legal assistance for freezing and confiscation (R38), extradition (R39), other forms of international cooperation (R40)
 
 ## FATF Guidance on Virtual Assets and VASPs (Updated 2021)
 

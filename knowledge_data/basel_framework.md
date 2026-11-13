@@ -24,9 +24,9 @@ Applies to internationally active banks and, through national implementation, to
 - Fintech lending partnerships: loans originated through fintechs carry risk weights on the bank's balance sheet
 
 #### Operational Risk
-- Basic Indicator Approach: 15% of average gross income
-- Standardized Approach: business-line-specific percentages
-- Advanced Measurement Approaches (replaced by SMA in Basel IV)
+- Under Basel III: Finalising post-crisis reforms (December 2017), a single standardised approach for measuring minimum operational risk capital requirements replaces all existing approaches in the Basel II framework (the Basic Indicator Approach, the Standardised Approach and the Advanced Measurement Approaches)
+- The standardised approach is based on the Business Indicator (BI), a financial-statement-based proxy for operational risk; the Business Indicator Component (BIC); and the Internal Loss Multiplier (ILM), through which a bank's internal operational risk loss experience affects the capital calculation
+- Implementation date: 1 January 2023 (deferred by one year from 2022)
 
 #### Market Risk
 - Standardized Approach with revised sensitivities-based method

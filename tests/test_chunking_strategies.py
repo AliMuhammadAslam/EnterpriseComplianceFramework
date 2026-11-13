@@ -247,7 +247,7 @@ class TestCorpusProvenance(unittest.TestCase):
 
     def test_unfilled_fields_are_omitted_not_none(self):
         # Chroma rejects None, so a blank effective date must not be written.
-        fields = self.kb._provenance_for("basel_framework.md")
+        fields = self.kb._provenance_for("cobit.md")
         self.assertNotIn("effective_date", fields)
         self.assertNotIn("version", fields)
         self.assertTrue(all(v for v in fields.values()))

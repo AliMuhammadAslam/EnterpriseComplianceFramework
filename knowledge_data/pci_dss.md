@@ -35,7 +35,7 @@ Applies to all entities that store, process, or transmit cardholder data (CHD) o
 ## PCI DSS v4.0 Key Changes
 - **Customized Approach**: Organizations can implement controls using a customized approach (instead of only defined approach)
 - **Targeted Risk Analysis**: Flexibility to define frequency of certain activities based on risk
-- **Enhanced Authentication**: Multi-factor authentication (MFA) required for all access into the CDE
+- **Enhanced Authentication**: Multi-factor authentication (MFA) implemented for all non-console access into the CDE (Requirement 8.4.2, PCI DSS v4.0.1)
 - **Expanded Scope**: New requirements for e-commerce and phishing protection
 - **Continuous Compliance**: Emphasis on security as a continuous process, not just annual assessment
 
