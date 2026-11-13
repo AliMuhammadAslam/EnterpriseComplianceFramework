@@ -236,5 +236,108 @@ class TestExecutionLogTimes(_WebAppCase):
         ])
 
 
+
+PROFILE = {"user_id": "default", "username": "john", "name": "John", "role": "Analyst"}
+
+
+class TestLoginLockout(_WebAppCase):
+    """Repeated wrong passwords lock the account for a while."""
+
+    def setUp(self):
+        super().setUp()
+        self.client = self.web_app.app.test_client()  # signed out
+        self.throttle = mock.patch.object(self.web_app, "login_throttle",
+                                          self.web_app._LoginThrottle())
+        self.throttle.start()
+        self.addCleanup(self.throttle.stop)
+
+    def _attempt(self, profile=None):
+        with mock.patch.object(self.web_app.user_store, "verify", return_value=profile):
+            return self.client.post("/login", data={"username": "John ", "password": "x"})
+
+    def test_fifth_failure_locks_out_even_the_right_password(self):
+        for _ in range(5):
+            self.assertEqual(self._attempt().status_code, 401)
+        r = self._attempt(PROFILE)
+        self.assertEqual(r.status_code, 429)
+        self.assertIn(b"Too many failed sign-in attempts", r.data)
+
+    def test_lockout_is_recorded_in_the_audit_trail(self):
+        for _ in range(6):
+            self._attempt()
+        entries = self.web_app.audit.query(user_id="john", action="LOGIN", status="failure", limit=50)
+        self.assertTrue(any(e["details"].get("reason") == "locked out" for e in entries))
+
+    def test_a_successful_sign_in_resets_the_count(self):
+        for _ in range(4):
+            self._attempt()
+        self.assertEqual(self._attempt(PROFILE).status_code, 302)
+        for _ in range(4):
+            self._attempt()
+        self.assertEqual(self._attempt(PROFILE).status_code, 302)
+
+    def test_lock_ends_after_the_lockout_period(self):
+        start = 1_000_000.0
+        with mock.patch.object(self.web_app.time, "time", return_value=start):
+            for _ in range(5):
+                self._attempt()
+            self.assertEqual(self._attempt(PROFILE).status_code, 429)
+        later = start + self.web_app.LOGIN_LOCKOUT_SECONDS + 1
+        with mock.patch.object(self.web_app.time, "time", return_value=later):
+            self.assertEqual(self._attempt(PROFILE).status_code, 302)
+
+
+class TestSessionTimeout(_WebAppCase):
+    """Sessions end after a period of inactivity, and after a maximum length."""
+
+    def _session(self, idle, age):
+        import time as _time
+        now = int(_time.time())
+        with self.client.session_transaction() as s:
+            s["user_id"] = "default"
+            s["login_at"] = now - age
+            s["last_seen"] = now - idle
+
+    def test_recent_activity_keeps_the_session(self):
+        self._session(idle=60, age=600)
+        self.assertEqual(self.client.get("/chat/history").status_code, 200)
+
+    def test_idle_session_is_ended(self):
+        self._session(idle=self.web_app.SESSION_IDLE_SECONDS + 5, age=self.web_app.SESSION_IDLE_SECONDS + 5)
+        self.assertEqual(self.client.get("/chat/history").status_code, 401)
+
+    def test_session_past_its_maximum_length_is_ended_even_if_active(self):
+        self._session(idle=10, age=self.web_app.SESSION_MAX_SECONDS + 5)
+        self.assertEqual(self.client.get("/chat/history").status_code, 401)
+
+
+class TestCrossSiteRequests(_WebAppCase):
+    """A state-changing request from another website is refused."""
+
+    def test_post_from_another_site_is_refused(self):
+        r = self.client.post("/chat", json={"message": "q"},
+                             headers={"Origin": "https://attacker.example"})
+        self.assertEqual(r.status_code, 403)
+
+    def test_delete_from_another_site_is_refused(self):
+        r = self.client.delete("/reports/anything", headers={"Referer": "https://attacker.example/page"})
+        self.assertEqual(r.status_code, 403)
+
+    def test_post_from_this_app_is_allowed(self):
+        r = self.client.post("/chat", data="not json", content_type="text/plain",
+                             headers={"Origin": "http://localhost"})
+        self.assertEqual(r.status_code, 400)  # reached the route, which rejects the body
+
+
+class TestSecurityHeaders(_WebAppCase):
+
+    def test_pages_carry_basic_browser_protections(self):
+        r = self.web_app.app.test_client().get("/login")
+        self.assertEqual(r.headers.get("X-Content-Type-Options"), "nosniff")
+        self.assertEqual(r.headers.get("X-Frame-Options"), "DENY")
+        self.assertIn("frame-ancestors 'none'", r.headers.get("Content-Security-Policy", ""))
+        self.assertEqual(r.headers.get("Referrer-Policy"), "same-origin")
+
+
 if __name__ == "__main__":
     unittest.main()

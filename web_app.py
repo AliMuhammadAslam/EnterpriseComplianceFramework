@@ -3,8 +3,11 @@ import sys
 import signal
 import atexit
 import tempfile
+import threading
+import time
 import uuid
 from functools import wraps
+from urllib.parse import urlsplit
 
 from flask import (
     Flask, render_template, request, jsonify, session, redirect, url_for
@@ -35,6 +38,10 @@ if not app.secret_key:
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    # Send the session cookie over HTTPS only. Off by default because the app
+    # runs on plain http locally; set SESSION_COOKIE_SECURE=true when served
+    # over HTTPS, or the cookie can travel unencrypted.
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() == "true",
     # Reject an oversized request before it is read. Without a cap, a body of
     # any size was received and written to disk before the upload size check
     # ran. One extra MB allows for the multipart encoding around the file.
@@ -42,6 +49,83 @@ app.config.update(
 )
 
 logger = logger_instance.get_logger("web_app")
+
+
+def _positive_int_env(name, default):
+    """A positive whole number from the environment, or the default."""
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Sign-in lockout: failed attempts are counted per account and per address
+# within the lockout window. The per-address limit is higher so one office
+# behind a shared address is not locked out by a few mistyped passwords.
+LOGIN_MAX_ATTEMPTS = _positive_int_env("LOGIN_MAX_ATTEMPTS", 5)
+LOGIN_IP_MAX_ATTEMPTS = _positive_int_env("LOGIN_IP_MAX_ATTEMPTS", 20)
+LOGIN_LOCKOUT_SECONDS = _positive_int_env("LOGIN_LOCKOUT_MINUTES", 15) * 60
+
+# A session ends after this long without a request, and after this long in
+# total even if it is in use.
+SESSION_IDLE_SECONDS = _positive_int_env("SESSION_IDLE_MINUTES", 30) * 60
+SESSION_MAX_SECONDS = _positive_int_env("SESSION_MAX_HOURS", 8) * 3600
+
+# Extra origins (scheme://host:port) allowed to send state-changing requests,
+# for a deployment where the public address differs from the Host header.
+TRUSTED_ORIGINS = {
+    o.strip().rstrip("/").lower()
+    for o in os.getenv("TRUSTED_ORIGINS", "").split(",") if o.strip()
+}
+
+
+class _LoginThrottle:
+    """Counts failed sign-ins and says how long a locked caller must wait.
+
+    Held in memory: a restart clears it, which is acceptable for a single
+    process. The lock covers the threaded development server.
+    """
+
+    def __init__(self):
+        self._failures = {}
+        self._lock = threading.Lock()
+
+    def _recent(self, key, now):
+        times = [t for t in self._failures.get(key, []) if now - t < LOGIN_LOCKOUT_SECONDS]
+        if times:
+            self._failures[key] = times
+        else:
+            self._failures.pop(key, None)
+        return times
+
+    def seconds_locked(self, username, ip):
+        """Seconds until this account or address may try again; 0 if not locked."""
+        now = time.time()
+        with self._lock:
+            wait = 0.0
+            for key, limit in ((("user", username), LOGIN_MAX_ATTEMPTS),
+                               (("ip", ip), LOGIN_IP_MAX_ATTEMPTS)):
+                times = self._recent(key, now)
+                if len(times) >= limit:
+                    wait = max(wait, LOGIN_LOCKOUT_SECONDS - (now - times[-1]))
+            return int(wait) + 1 if wait > 0 else 0
+
+    def record_failure(self, username, ip):
+        now = time.time()
+        with self._lock:
+            if len(self._failures) > 10000:
+                for key in list(self._failures):
+                    self._recent(key, now)
+            for key in (("user", username), ("ip", ip)):
+                self._failures.setdefault(key, []).append(now)
+
+    def reset(self, username):
+        with self._lock:
+            self._failures.pop(("user", username), None)
+
+
+login_throttle = _LoginThrottle()
 
 
 @app.errorhandler(413)
@@ -108,6 +192,53 @@ def _get_client_ip():
     return request.remote_addr or ""
 
 
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.before_request
+def reject_cross_site_requests():
+    """Refuse state-changing requests sent from another website.
+
+    Browsers attach Origin (or at least Referer) to these requests, so a page
+    on another site that tries to post to this app is identified and refused.
+    Requests with neither header come from non-browser clients and are not
+    cross-site forgeries.
+    """
+    if request.method not in _UNSAFE_METHODS:
+        return None
+    source = request.headers.get("Origin") or request.headers.get("Referer")
+    if not source:
+        return None
+    parts = urlsplit(source.strip())
+    origin_host = parts.netloc.lower()
+    if origin_host and (
+        origin_host == request.host.lower()
+        or f"{parts.scheme.lower()}://{origin_host}" in TRUSTED_ORIGINS
+    ):
+        return None
+    logger.warning(f"Rejected cross-site {request.method} to {request.path} from {source!r}")
+    return jsonify({"error": "Request rejected: it did not come from this application."}), 403
+
+
+@app.before_request
+def enforce_session_timeout():
+    """End a session that has been idle too long or has run too long."""
+    if not session.get("user_id"):
+        return None
+    now = int(time.time())
+    started = session.get("login_at", now)
+    last_seen = session.get("last_seen", now)
+    if now - last_seen > SESSION_IDLE_SECONDS or now - started > SESSION_MAX_SECONDS:
+        uid = session.get("user_id")
+        session.clear()
+        audit.log(action="LOGOUT", user_id=uid, details={"reason": "session expired"},
+                  ip_address=_get_client_ip())
+        return None
+    session["login_at"] = started
+    session["last_seen"] = now
+    return None
+
+
 @app.after_request
 def add_no_cache_headers(response):
     """Stop the browser caching signed-in pages.
@@ -118,6 +249,13 @@ def add_no_cache_headers(response):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    # Basic browser protections: do not guess content types, do not let other
+    # sites frame the app (clickjacking), and do not send this app's addresses
+    # to other sites as the referrer.
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
     return response
 
 
@@ -194,9 +332,30 @@ def login():
 
     username = request.form.get("username", "")
     password = request.form.get("password", "")
+    account = (username or "").strip().lower()
+    ip = _get_client_ip()
+
+    # Checked before the password, so a locked account cannot be probed.
+    wait = login_throttle.seconds_locked(account, ip)
+    if wait:
+        audit.log(
+            action="LOGIN",
+            user_id=account or "unknown",
+            status="failure",
+            details={"reason": "locked out"},
+            ip_address=ip,
+        )
+        minutes = -(-wait // 60)
+        unit = "minute" if minutes == 1 else "minutes"
+        return render_template(
+            "login.html",
+            error=f"Too many failed sign-in attempts. Try again in {minutes} {unit}.",
+        ), 429
+
     profile = user_store.verify(username, password)
 
     if not profile:
+        login_throttle.record_failure(account, ip)
         audit.log(
             action="LOGIN",
             user_id=(username or "unknown").strip().lower(),
@@ -208,7 +367,9 @@ def login():
             "login.html", error="Invalid username or password"
         ), 401
 
+    login_throttle.reset(account)
     session.clear()
+    session["login_at"] = session["last_seen"] = int(time.time())
     session["user_id"] = profile["user_id"]
     session["username"] = profile["username"]
     session["name"] = profile["name"]

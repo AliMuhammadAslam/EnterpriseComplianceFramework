@@ -304,7 +304,7 @@ Both default to the development run that the reported tables come from and name 
 python -m unittest discover -s tests
 ```
 
-298 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
+309 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
 
 ---
 
@@ -354,6 +354,15 @@ OPENAI_API_KEY=your-openai-api-key-here
 SECRET_KEY=change-this-to-a-long-random-string
 USERS_FILE=./users.json
 
+# Sign-in and session security
+LOGIN_MAX_ATTEMPTS=5
+LOGIN_IP_MAX_ATTEMPTS=20
+LOGIN_LOCKOUT_MINUTES=15
+SESSION_IDLE_MINUTES=30
+SESSION_MAX_HOURS=8
+SESSION_COOKIE_SECURE=false
+TRUSTED_ORIGINS=
+
 # LLM Settings
 DEFAULT_MODEL=gpt-4o-2024-08-06
 SEED=42
@@ -389,6 +398,8 @@ EVIDENCE_TRACE_DIR=./evidence_traces
 Only `OPENAI_API_KEY` and `SECRET_KEY` must be set; every other value above is the default the code uses when the variable is absent.
 
 > Set `SECRET_KEY` to a long random value. It signs the session cookie, so keep it private and out of version control.
+
+**Security controls.** Repeated failed sign-ins lock the account (and, at a higher threshold, the address) for 15 minutes, and each lockout is recorded in the audit trail. Sessions end after 30 minutes of inactivity or 8 hours in total. State-changing requests that come from another website are refused, and every response carries basic browser protections against content sniffing, framing (clickjacking) and referrer leakage. When serving over HTTPS, set `SESSION_COOKIE_SECURE=true`. The lockout counters are held in memory, so they reset when the app restarts.
 
 > On first startup the system ingests all files from `knowledge_data/` into ChromaDB. It re-ingests automatically whenever a knowledge file, a file name, `corpus_manifest.json`, the chunk settings or the embedding model change, and chunks from removed or shortened files are deleted, so no manual steps are needed after updating a knowledge file.
 
@@ -520,6 +531,13 @@ All settings are controlled via environment variables with sensible defaults bui
 | `OPENAI_API_KEY` | required | OpenAI API key |
 | `SECRET_KEY` | required | Secret used to sign the session cookie. The app refuses to start without it; there is no fallback value |
 | `USERS_FILE` | `./users.json` | Path to the seeded user account store |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins for one account before it is locked |
+| `LOGIN_IP_MAX_ATTEMPTS` | `20` | Failed sign-ins from one address before it is locked |
+| `LOGIN_LOCKOUT_MINUTES` | `15` | How long a lockout lasts after the last failed attempt |
+| `SESSION_IDLE_MINUTES` | `30` | A session ends after this long without activity |
+| `SESSION_MAX_HOURS` | `8` | A session ends after this long in total, even if active |
+| `SESSION_COOKIE_SECURE` | `false` | Set to `true` when the app is served over HTTPS, so the session cookie is only sent encrypted |
+| `TRUSTED_ORIGINS` | empty | Comma-separated extra origins (`https://host:port`) allowed to send requests, for a deployment whose public address differs from the Host header |
 | `DEFAULT_MODEL` | `gpt-4o-2024-08-06` | Dated model snapshot (any litellm-supported model; avoid moving aliases like `gpt-4o`) |
 | `SEED` | `42` | Request seed passed to every completion call |
 | `TEMPERATURE` | `0.0` | LLM temperature; 0 reduces sampling variability but does not guarantee determinism on its own |
