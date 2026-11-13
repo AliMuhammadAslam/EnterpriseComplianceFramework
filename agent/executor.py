@@ -2,7 +2,7 @@ import os
 from pydantic import BaseModel
 from litellm import completion
 from dotenv import load_dotenv
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from utils.logger import logger_instance
 from utils import run_config
 
@@ -12,7 +12,7 @@ load_dotenv()
 class ExecutionResult(BaseModel):
     success: bool
     result: Any
-    error: str = None
+    error: Optional[str] = None
     step_results: List[Dict[str, Any]] = []
 
 
@@ -39,6 +39,7 @@ class Executor:
 
         step_results = []
         overall_success = True
+        errors = []
 
         for step in plan.steps:
             if verbose:
@@ -51,11 +52,27 @@ class Executor:
                 self.logger.error(error_msg)
                 step_results.append({"step_number": step.step_number, "success": False, "error": error_msg})
                 overall_success = False
+                errors.append(error_msg)
                 continue
 
-            result_text = self._execute_with_llm(
-                step, step_results, rag_context, conversation_context
-            )
+            # A failed call is recorded as a failed step. Returning the error as
+            # step text used to mark it successful and feed it into the answer.
+            try:
+                result_text = self._execute_with_llm(
+                    step, step_results, rag_context, conversation_context
+                )
+            except Exception as e:
+                error_msg = f"Step {step.step_number} failed: {e}"
+                self.logger.error(error_msg)
+                step_results.append({"step_number": step.step_number, "success": False, "error": error_msg})
+                overall_success = False
+                errors.append(error_msg)
+                if verbose:
+                    # The verbose log is shown in the browser; the provider's
+                    # error text, which can include part of the API key, is not.
+                    print(f"[EXECUTOR] Step {step.step_number} failed (details in the server log)")
+                continue
+
             step_results.append({"step_number": step.step_number, "success": True, "result": result_text})
 
             if verbose:
@@ -73,6 +90,7 @@ class Executor:
         return ExecutionResult(
             success=overall_success,
             result=final_result,
+            error="; ".join(errors) or None,
             step_results=step_results,
         )
 
@@ -114,22 +132,20 @@ Use the provided reference material to give accurate, well-cited responses.
 Provide clear, specific, and actionable results. Citation rules:
 - Use ONLY the control numbers, clause numbers, article numbers, and section identifiers that appear in the provided reference material above. Do not rely on your training knowledge for specific identifiers. Standards are versioned and numbering changes between versions.
 - Every requirement or control you mention must include its identifier exactly as it appears in the reference material (e.g. the clause number, article number, control ID, or section reference).
-- If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one."""
+- If the reference material does not contain a specific identifier for something, say so explicitly rather than inventing one.
+- The "Chunk N" headings and relevance scores in the reference material are retrieval labels, not part of any document. Never cite them; name the source document and its clause, article or section instead."""
 
-        try:
-            response = completion(
-                model=self.model_config["model"],
-                messages=[
-                    {"role": "system", "content": system_message},
-                    {"role": "user", "content": f"{prior_context}\nTask: {step.description}"},
-                ],
-                temperature=self.model_config["temperature"],
-                max_tokens=self.model_config["max_tokens"],
-                seed=run_config.seed(),
-            )
-            return response.choices[0].message.content.strip()
-        except Exception as e:
-            return f"Error executing step: {str(e)}"
+        response = completion(
+            model=self.model_config["model"],
+            messages=[
+                {"role": "system", "content": system_message},
+                {"role": "user", "content": f"{prior_context}\nTask: {step.description}"},
+            ],
+            temperature=self.model_config["temperature"],
+            max_tokens=self.model_config["max_tokens"],
+            seed=run_config.seed(),
+        )
+        return response.choices[0].message.content.strip()
 
     def _dependencies_met(self, step, completed_steps: List[Dict]) -> bool:
         """Check that all declared step dependencies have already succeeded."""
@@ -166,7 +182,8 @@ Write a clear, comprehensive answer that directly addresses what the user asked.
 - Structure your response with clear sections where appropriate
 - Do not mention internal processing steps
 - If the context indicates that no company documents have been uploaded, explicitly tell the user that your response is based solely on the regulatory knowledge base and that uploading company documents will enable document-specific analysis
-- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned, so do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly."""
+- Citation rule: use ONLY the control IDs, clause numbers, article numbers, and section references that appear in the provided reference material. Standards are versioned, so do not substitute numbering from your training knowledge. If no identifier is present in the reference material, state that explicitly.
+- The "Chunk N" headings and relevance scores in the reference material are retrieval labels, not part of any document. Never cite them, and leave out any that appear in the analysis; name the source document and its clause, article or section instead."""
 
         try:
             response = completion(

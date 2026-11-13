@@ -1,7 +1,7 @@
 # State Bank of Pakistan (SBP) — Fintech & Digital Financial Services Regulations
 
 ## Overview
-The State Bank of Pakistan (SBP) is the central bank and primary regulator for banking and financial services in Pakistan. SBP regulates fintech entities through a combination of regulations, circulars, and licensing frameworks covering Electronic Money Institutions (EMIs), branchless banking, payment systems, and digital lending. Key regulatory instruments include the Payment Systems and Electronic Fund Transfers Act 2007, SBP's EMI Regulations 2019, and Branchless Banking Regulations.
+The State Bank of Pakistan (SBP) is the central bank and primary regulator for banking and financial services in Pakistan. SBP regulates fintech entities through a combination of regulations, circulars, and licensing frameworks covering Electronic Money Institutions (EMIs), branchless banking, payment systems, and digital lending. Key regulatory instruments include the Payment Systems and Electronic Fund Transfers Act 2007, SBP's Regulations for EMIs (issued 2019, revised 2023), and Branchless Banking Regulations.
 
 ## Scope
 Applies to all entities providing financial services in Pakistan, including commercial banks, microfinance banks, Electronic Money Institutions, payment system operators, payment service providers, and fintech companies operating under SBP-licensed partnerships.
@@ -12,19 +12,19 @@ Applies to all entities providing financial services in Pakistan, including comm
 - Minimum paid-up capital: PKR 200 million
 - Must be incorporated as a public or private limited company under the Companies Act 2017
 - Fit and proper criteria for directors and key executives
-- Comprehensive business plan with 5-year financial projections
+- Business plan including financial projections and projected market share for the next 5 years (Annexure G)
 
 ### Permissible Activities
 - Issuance of electronic money (e-wallets, prepaid instruments)
 - Payment processing and fund transfers
 - Cash-in and cash-out through authorized agents
 - Bill payments and merchant payments
-- Interoperable transactions via RAAST (Pakistan's instant payment system)
+- Interoperability with other EMIs, banks and PSOs/PSPs as and when advised by SBP, including Raast connectivity at SBP's discretion (section 18)
 
 ### Operational Requirements
-- Safeguarding of customer funds in scheduled banks
+- Funds received from customers are placed in a trust account with a licensed bank rated at least 'A'; no more than 50% of e-money balances with one trustee once balances exceed PKR 300 million (section 16)
 - Customer funds cannot be commingled with EMI operational funds
-- Real-time transaction monitoring and reconciliation
+- Transaction alerts sent to customers in real time for all transactions, and a procedure for reconciliation of e-money with funds in the trust account
 - Enhanced E-Money Wallet: balance up to PKR 1,000,000 for individual customers, subject to
   proof of income or source of funds, CNIC and SIM pairing, transaction monitoring and customer
   risk profiling (Regulations for EMIs, 2023, para 14(III))
@@ -39,8 +39,8 @@ Level-specific limits below are those of BPRD Circular No. 10 of 2019, dated 30 
   maximum balance PKR 200,000; opened with CNIC only
 - **Level 1 (L1)**: Daily limit PKR 50,000; monthly limit PKR 200,000; no annual limit and no
   maximum balance prescribed; biometric verification required
-- **Level 2 (L2)**: No SBP numerical limits. The financial institution sets limits from the
-  customer risk profile and its own monitoring capacity; full KYC with source of income
+- **Level 2 (L2)**: the 2019 Regulations set no Level 2 limits or KYC requirements; they refer
+  to Level 2 only in allowing international transactions on ATM/debit cards for Level 2 account holders
 - Level 3 is not a current customer account level. It existed in the earlier framework and is
   absent from the structure set by the 2019 revision, which uses Levels 0, 1 and 2
 
@@ -51,40 +51,34 @@ day, PKR 300,000 per month and a maximum credit balance of PKR 1,000,000, with n
 stated. The Level 0, 1 and 2 classifications remain in use for SBP reporting.
 
 ### Agent Network Requirements
-- Agents must be registered and trained by the financial institution
-- Agents must display branchless banking signage and maintain records
-- Due diligence on agents including background checks
-- Agent exclusivity arrangements permitted but not mandatory
+- Financial institutions must conduct enhanced due diligence of interested agents and ensure agents are properly trained to serve customers
+- Exclusivity is not necessarily required (for example, the one-to-one model does not require it)
 
 ## Payment Systems and Electronic Fund Transfers Act 2007
 
 ### Key Provisions
 - SBP authority to designate and regulate payment systems
-- Licensing requirements for payment system operators (PSOs) and payment service providers (PSPs)
+- Licensing of Electronic Money Institutions (section 24)
 - Legal recognition of electronic fund transfers
 - Consumer protection provisions for unauthorized transactions
-- Settlement finality — payments processed through designated systems are irrevocable
+- Settlement finality: where the settlement rules of a Designated Payment System provide that settlement of a payment obligation through an entry to, or a payment out of, an account at the State Bank is final and irrevocable, the entry or payment shall not be required to be reversed, repaid or set aside (section 21(2))
 
 ### RAAST — Instant Payment System
 - Pakistan's national instant payment system launched by SBP (2021)
 - Enables real-time person-to-person (P2P) transfers via mobile number (Raast ID)
-- Mandatory participation for all banks and EMIs
-- Operates 24/7 with immediate settlement
+- Participation is mandatory for banks. For EMIs it is at SBP's discretion: SBP may provide Raast membership and connectivity to EMIs that have been granted go-live/commercial launch approval (Regulations for EMIs, revised 2023, section 18(II))
+- Funds transferred through Raast should be credited to the recipient's account within 20 seconds of the credit advice, and all Raast transactions are final and irrevocable (DISD Circular No. 1 of 2022)
 
-## Digital Lending Regulations (Circular 2022)
+## Digital Lending
 
 ### Licensing and Conduct
-- Digital lending only through SBP-licensed entities (banks, MFBs, NBFCs)
-- Mandatory disclosure of terms: APR, fees, penalties, total cost of credit
-- Prohibition on predatory lending practices
-- Maximum markup rate caps as prescribed by SBP
-- Grievance redressal mechanism mandatory
+- Digital lending only through licensed entities: banks and MFBs are licensed by SBP; NBFCs are licensed by SECP, which issued the digital lending standards for NBFCs lending through digital channels / mobile applications (SECP Circular No. 15 of 2022)
+- Under SECP Circular No. 15 of 2022 (as described in SECP's announcement): a Key Fact Statement must be provided before disbursement, covering the loan amount, annual percentage rate, tenor, instalment amounts and dates, and all fees and charges; any fee not in the Key Fact Statement cannot be charged
+- Licensed digital lenders must disclose their full corporate name and licensing status on their platforms and apps
+- A grievance redressal mechanism applies over and above the general NBFC grievance redressal framework
 
 ### Data Privacy and Protection
-- Borrower consent required before accessing device data
-- Prohibition on accessing contacts, photos, or unrelated personal data
-- Data retention limited to loan lifecycle plus regulatory retention period
-- Mandatory data encryption in transit and at rest
+- Digital lenders may not access a borrower's phone book, contacts list or photo gallery, even with the borrower's consent, and may not contact persons in the contact list other than guarantors the borrower has specifically authorised (SECP Circular No. 15 of 2022)
 
 ## Anti-Money Laundering / Counter-Financing of Terrorism (AML/CFT)
 
@@ -94,11 +88,11 @@ stated. The Level 0, 1 and 2 classifications remain in use for SBP reporting.
 - Suspicious Transaction Reporting (STR) to Financial Monitoring Unit (FMU)
 - Currency Transaction Reports (CTR) for transactions exceeding PKR 2 million
 - Ongoing transaction monitoring with risk-based approach
-- Record retention: minimum 5 years after end of business relationship
+- Record retention (Regulation 8): CDD records for ten years after the business relationship is ended; transaction records and records of STRs and CTRs for a minimum of ten years from completion of the transaction
 - Compliance officer appointment mandatory
 - Staff training on AML/CFT at least annually
 
-## Information Security Guidelines for Financial Institutions (Circular 2017)
+## Enterprise Technology Governance & Risk Management Framework for Financial Institutions (BPRD Circular No. 05 of 2017)
 
 ### Key Requirements
 - Information security policy approved by the Board of Directors
@@ -108,45 +102,25 @@ stated. The Level 0, 1 and 2 classifications remain in use for SBP reporting.
 - Business continuity and disaster recovery plans
 - Data classification and handling procedures
 - Third-party risk assessments for outsourced services
-- Annual IT audit by qualified external auditors
+- IT audit programme run by the FI's audit function and approved by the Board or its Audit Committee, with an annual audit plan and an IT audit cycle setting the frequency of audits from a risk assessment (section 6.1)
 
 ## Data Localisation, Residency, and Cross-Border Transfer Rules
 
-### SBP Data Localisation Requirements
-- **Primary data storage in Pakistan**: All transaction data, customer data, and financial records generated by SBP-regulated entities must be stored on servers physically located within Pakistan. This requirement applies to core banking systems, payment processing systems, and customer identity data.
-- **Real-time data in-country**: Real-time transaction processing and core financial data must reside in Pakistan-based data centres. Replication to offshore disaster recovery sites is permitted only if the primary copy remains in Pakistan.
-- **Cloud services**: Use of cloud infrastructure (domestic or foreign) for data storage or processing requires SBP approval. Foreign cloud providers must maintain a local data centre in Pakistan or partner with a Pakistan-based cloud node to store regulated data within Pakistani borders.
-- **Payment system data**: Payment transaction records processed through RAAST, 1LINK, PRISM, or other SBP-designated payment systems must be stored locally and may not be offshored.
+### SBP Rules on Where Regulated Data May Be Held
+- **Cloud outsourcing**: SBP's Framework on Outsourcing to Cloud Service Providers (BPRD Circular No. 01 of 2023, 16 January 2023) applies to all SBP regulated entities (REs) and to all cloud service and deployment models (section D). All types of workloads (material and non-material) may be outsourced to reputable onshore (domestic) cloud service providers (CSPs). EMIs and non-designated PSOs/PSPs may outsource their material and non-material workloads to offshore (outside Pakistan) CSPs. Banks, MFBs, DBs, DFIs and designated PSOs/PSPs may outsource their non-material workloads to offshore CSPs; outsourcing of their material workloads to offshore CSPs is subject to SBP approval, granted case by case (section E.2).
+- **Material workload**: all systems, applications and services that are fundamental for carrying out the business of an RE and, if disrupted, have the potential to significantly impact its business operations, reputation or profitability (section E.1).
+- **Limits on location**: REs shall give preference to onshore CSPs and shall not process and store their data in unfriendly or hostile jurisdictions. SBP may instruct an RE to restrict outsourcing of workloads to CSPs, and may instruct REs to shift cloud workloads to an SBP-designated onshore community cloud when one is available (sections E.2(g)-(h), E.4, E.6).
+- **Notice to SBP**: for material workloads, REs shall provide SBP, one month before placing services with the CSP, the CSP's name, a description of the activities and data to be placed with it, the relevant dates, and the service and deployment models (section V.4).
+- **Non-cloud outsourcing by banks, MFBs and DFIs**: under the Framework for Risk Management in Outsourcing Arrangements by Financial Institutions (BPRD Circular No. 06 of 2019), any outsourcing arrangement outside Pakistan, excluding group outsourcing, shall require SBP's prior approval; the offshore service provider must be a regulated entity; sub-contracting of offshore arrangements is not allowed; and all information relating to outsourcing outside Pakistan must be available domestically for review or inspection by SBP at any time (section IX).
 
 ### Cross-Border Data Transfer Controls
-- **Prior SBP approval required**: Any transfer of customer financial data, transaction records, or personally identifiable information (PII) to servers or entities outside Pakistan requires prior written approval from SBP.
-- **Restricted categories**: The following data categories are subject to strict cross-border transfer restrictions: (a) customer identification and KYC records, (b) account and transaction history, (c) credit information, (d) AML/CFT suspicious activity data.
-- **Outsourcing to foreign entities**: Where technology or operations are outsourced to foreign service providers, contracts must include data sovereignty clauses ensuring regulated data is not moved outside Pakistan without SBP consent. SBP must be notified of all material outsourcing arrangements.
-- **Data sharing with foreign regulators**: Sharing of data with foreign regulatory bodies or law enforcement is only permissible under bilateral agreements or upon SBP's written consent; entities must notify SBP before complying with foreign data requests.
-- **Data in transit encryption**: All data transmitted cross-border (where permitted) must use strong encryption (minimum TLS 1.2; TLS 1.3 recommended) and must be logged for audit purposes.
+- **When SBP approval is required**: approval is not required for every transfer outside Pakistan. It is required for offshore cloud outsourcing of material workloads by banks, MFBs, DBs, DFIs and designated PSOs/PSPs (Cloud Framework 2023, section E.2(c)), and for non-cloud outsourcing outside Pakistan by banks, MFBs and DFIs, excluding group outsourcing (Outsourcing Framework 2019, section IX(a)).
+- **Cloud contracts**: agreements with CSPs must include a requirement of obtaining prior written authorization from the RE before transferring information assets and services/servers, and a prohibition on sharing the RE's data with any other entity, including host country regulatory or law enforcement authorities, without the RE's prior written approval (Cloud Framework 2023, Appendix I, items 9 and 12).
 
-### Customer Data Privacy and Consent
-- **Informed consent**: Regulated entities must obtain explicit, informed consent from customers before collecting, processing, or sharing their personal data. Consent forms must specify purpose, retention period, and third-party sharing.
-- **Purpose limitation**: Customer data may only be used for the purpose for which consent was obtained. Secondary use (e.g., marketing analytics) requires separate consent.
-- **Data retention limits**: Customer data must not be retained beyond the period necessary for business and regulatory purposes. The minimum retention period for AML/CFT records is 5 years after the end of the business relationship; payment records must be retained for at least 5 years.
-- **Right to access and rectification**: Customers have the right to access their personal data held by regulated entities and to request correction of inaccurate records.
+### Customer Data Confidentiality and Retention
+- **Confidentiality**: EMIs must ensure that personal information of customers obtained during operations is used, disclosed, retained and protected as committed or agreed (Regulations for EMIs, section 21(I))
+- **Retention of AML/CFT records**: under the SBP AML/CFT/CPF Regulations (Regulation 8), CDD records must be kept for ten years after the business relationship is ended and transaction records for a minimum of ten years from completion of the transaction
 - **Data breach notification**: SBP does not set a 72-hour deadline. Under the Regulations for
   EMIs, 2023, section 21, all security breaches must be reported immediately, with a detailed
   report submitted within 15 days. For banks and microfinance banks, BPRD Circular No. 05 of 2017
   requires incidents involving compromised customer data to be reported to BPRD within 48 hours.
-
-## SBP Risk Management Guidelines
-
-### Operational Risk Management
-- Risk Management Committee at board level
-- Three Lines of Defence model
-- Key Risk Indicators (KRIs) monitoring
-- Operational loss data collection and reporting
-- IT risk management framework
-- Outsourcing risk management policy
-
-### Compliance Risk Management
-- Compliance function independent of business units
-- Compliance risk assessment methodology
-- Regulatory change management process
-- Compliance monitoring and testing program

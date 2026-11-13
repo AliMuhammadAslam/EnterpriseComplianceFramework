@@ -7,9 +7,14 @@ class DocumentChunker:
     """Splits documents into overlapping chunks for embedding."""
 
     def __init__(self, chunk_size: int = None, chunk_overlap: int = None):
-        self.chunk_size = chunk_size or int(os.getenv("CHUNK_SIZE", "500"))
-        self.chunk_overlap = chunk_overlap or int(
-            os.getenv("CHUNK_OVERLAP", "50")
+        # Compared with None, not truthiness, so an explicit overlap of 0 is kept.
+        self.chunk_size = (
+            chunk_size if chunk_size is not None
+            else int(os.getenv("CHUNK_SIZE", "500"))
+        )
+        self.chunk_overlap = (
+            chunk_overlap if chunk_overlap is not None
+            else int(os.getenv("CHUNK_OVERLAP", "50"))
         )
         # Guard against a misconfigured overlap >= size, which would stop the
         # split loop from advancing and hang on the first document.
@@ -53,6 +58,10 @@ class DocumentChunker:
                 },
             })
 
+            # Stop once the last word is covered. Stepping back by the overlap
+            # from here would emit a tail chunk already inside this one.
+            if end >= len(words):
+                break
             start = end - self.chunk_overlap
             chunk_index += 1
 

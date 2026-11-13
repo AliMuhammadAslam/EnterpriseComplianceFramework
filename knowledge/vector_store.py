@@ -1,5 +1,6 @@
 import os
 import chromadb
+from chromadb.errors import NotFoundError
 from typing import List, Dict, Any, Optional
 from utils.logger import logger_instance
 from knowledge.embeddings import EmbeddingService
@@ -11,6 +12,10 @@ load_dotenv()
 # Ablation runs index the same corpus under a second collection name, so this
 # is a parameter rather than a hardcoded string.
 KNOWLEDGE_COLLECTION = "regulatory_knowledge"
+
+# Chunks per embeddings request for uploads. A chunk is up to ~500 words, so
+# 100 stays well inside the API's per-request token limit.
+COMPANY_EMBED_BATCH = 100
 
 
 class VectorStore:
@@ -59,13 +64,47 @@ class VectorStore:
             f"Added {len(documents)} docs to {collection_name}"
         )
 
+    def replace_knowledge_collection(
+        self,
+        documents: List[str],
+        metadatas: List[Dict[str, Any]],
+        ids: List[str],
+        collection_name: str = KNOWLEDGE_COLLECTION,
+        batch_size: int = 50,
+    ):
+        """Make a knowledge collection hold exactly these documents.
+
+        Upserting alone left chunks from deleted files, or from the old tail
+        of a shortened file, retrievable forever. Every current chunk is
+        upserted first and only then are ids no longer in the corpus deleted,
+        so a failure part way never leaves the collection emptier than before.
+        """
+        for start in range(0, len(documents), batch_size):
+            end = start + batch_size
+            self.add_knowledge_documents(
+                documents=documents[start:end],
+                metadatas=metadatas[start:end],
+                ids=ids[start:end],
+                collection_name=collection_name,
+            )
+
+        collection = self._get_or_create_collection(collection_name)
+        stale = sorted(set(collection.get(include=[])["ids"]) - set(ids))
+        if stale:
+            collection.delete(ids=stale)
+        self.logger.info(
+            f"Rebuilt {collection_name} with {len(documents)} docs, "
+            f"removed {len(stale)} stale"
+        )
+
     def query_knowledge(
         self,
         query: str,
         top_k: int = 5,
         collection_name: str = KNOWLEDGE_COLLECTION,
+        source: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        """Query a regulatory knowledge collection."""
+        """Query a regulatory knowledge collection, optionally within one source file."""
         try:
             collection = self._get_or_create_collection(collection_name)
             if collection.count() == 0:
@@ -74,6 +113,7 @@ class VectorStore:
             results = collection.query(
                 query_embeddings=[query_embedding],
                 n_results=min(top_k, collection.count()),
+                where={"source": source} if source else None,
             )
             return self._format_results(results)
         except Exception as e:
@@ -95,16 +135,22 @@ class VectorStore:
         metadatas: List[Dict[str, Any]],
         ids: List[str],
     ):
-        """Add documents to a user-specific company document collection."""
+        """Add documents to a user-specific company document collection.
+
+        Embedded in batches: one request for a whole large document exceeded
+        the embeddings API's per-request token limit, so the upload failed.
+        """
         collection_name = f"company_docs_{user_id}"
         collection = self._get_or_create_collection(collection_name)
-        embeddings = self.embedding_service.embed_batch(documents)
-        collection.add(
-            documents=documents,
-            embeddings=embeddings,
-            metadatas=metadatas,
-            ids=ids,
-        )
+        for start in range(0, len(documents), COMPANY_EMBED_BATCH):
+            end = start + COMPANY_EMBED_BATCH
+            embeddings = self.embedding_service.embed_batch(documents[start:end])
+            collection.add(
+                documents=documents[start:end],
+                embeddings=embeddings,
+                metadatas=metadatas[start:end],
+                ids=ids[start:end],
+            )
         self.logger.info(
             f"Added {len(documents)} docs to {collection_name}"
         )
@@ -141,6 +187,47 @@ class VectorStore:
             )
             return []
 
+    def query_company_documents_batch(
+        self,
+        user_id: str,
+        queries: List[str],
+        top_k: int = 5,
+        doc_ids: Optional[List[str]] = None,
+    ) -> List[List[Dict[str, Any]]]:
+        """Run several queries against a user's documents in one round trip.
+
+        Returns one result list per query, in the order given. Blank queries
+        get an empty list rather than shifting the others out of alignment.
+        """
+        collection_name = f"company_docs_{user_id}"
+        answers: List[List[Dict[str, Any]]] = [[] for _ in queries]
+        live = [(i, q) for i, q in enumerate(queries) if q and q.strip()]
+        if not live:
+            return answers
+        try:
+            collection = self.client.get_collection(collection_name)
+            if collection.count() == 0:
+                return answers
+            embeddings = self.embedding_service.embed_batch([q for _, q in live])
+            where_filter = {"doc_id": {"$in": doc_ids}} if doc_ids else None
+            results = collection.query(
+                query_embeddings=embeddings,
+                n_results=min(top_k, collection.count()),
+                where=where_filter,
+            )
+            for position, (index, _) in enumerate(live):
+                answers[index] = self._format_results({
+                    "documents": [results["documents"][position]],
+                    "metadatas": [results["metadatas"][position]] if results.get("metadatas") else None,
+                    "distances": [results["distances"][position]] if results.get("distances") else None,
+                })
+        except Exception as e:
+            self.logger.warning(
+                f"ChromaDB batch query failed for {collection_name}, "
+                f"returning empty results: {e}"
+            )
+        return answers
+
     def company_doc_count(self, user_id: str) -> int:
         """Return number of chunks in a user's company docs."""
         collection_name = f"company_docs_{user_id}"
@@ -160,14 +247,23 @@ class VectorStore:
             self.logger.error(f"Error deleting collection: {e}")
 
     def delete_company_document(self, user_id: str, doc_id: str):
-        """Delete a single document's chunks from a user's collection by doc_id."""
+        """Delete a single document's chunks from a user's collection by doc_id.
+
+        Raises on failure. Swallowing the error let the caller report the
+        document deleted while its chunks stayed searchable.
+        """
         collection_name = f"company_docs_{user_id}"
         try:
             collection = self.client.get_collection(collection_name)
+        except NotFoundError:
+            # No collection means there are no chunks left to remove.
+            return
+        try:
             collection.delete(where={"doc_id": doc_id})
-            self.logger.info(f"Deleted chunks for doc_id {doc_id} from {collection_name}")
         except Exception as e:
             self.logger.error(f"Error deleting document {doc_id} from {collection_name}: {e}")
+            raise
+        self.logger.info(f"Deleted chunks for doc_id {doc_id} from {collection_name}")
 
     def _format_results(self, results: dict) -> List[Dict[str, Any]]:
         """Format ChromaDB query results into a clean list of dicts."""

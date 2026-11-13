@@ -33,14 +33,20 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 csv.field_size_limit(10_000_000)
 
-# Two-sided 95% critical values. Falls back to the normal approximation for
-# sample sizes not listed, which only happens on the smaller category subsets.
+# Two-sided 95% critical values of Student's t, by degrees of freedom. The
+# table once started at 4 and skipped values, and anything missing fell back
+# to 1.96: at 2 degrees of freedom that is 1.96 against 4.30, so an interval
+# came out less than half its proper width. Every value up to 30 is listed;
+# beyond that t_value() uses an expansion accurate to about 1e-4.
 T_CRITICAL = {
-    4: 2.7764, 5: 2.5706, 6: 2.4469, 7: 2.3646, 8: 2.3060, 9: 2.2622,
-    10: 2.2281, 11: 2.2010, 12: 2.1788, 13: 2.1604, 14: 2.1448, 15: 2.1314,
-    16: 2.1199, 17: 2.1098, 18: 2.1009, 19: 2.0930, 20: 2.0860, 24: 2.0639,
-    29: 2.0452, 33: 2.0345, 34: 2.0322, 39: 2.0227, 41: 2.0195,
+    1: 12.7062, 2: 4.3027, 3: 3.1824, 4: 2.7764, 5: 2.5706, 6: 2.4469,
+    7: 2.3646, 8: 2.3060, 9: 2.2622, 10: 2.2281, 11: 2.2010, 12: 2.1788,
+    13: 2.1604, 14: 2.1448, 15: 2.1314, 16: 2.1199, 17: 2.1098, 18: 2.1009,
+    19: 2.0930, 20: 2.0860, 21: 2.0796, 22: 2.0739, 23: 2.0687, 24: 2.0639,
+    25: 2.0595, 26: 2.0555, 27: 2.0518, 28: 2.0484, 29: 2.0452, 30: 2.0423,
+    33: 2.0345, 34: 2.0322, 39: 2.0227, 41: 2.0195,
 }
+Z_975 = 1.959964
 
 COMPARISONS = [
     ("Retrieval against no retrieval", "fixed_rag", "no_retrieval", None),
@@ -91,7 +97,20 @@ def load(path):
 
 
 def t_value(n):
-    return T_CRITICAL.get(n - 1, 1.96)
+    """Two-sided 95% critical t for a sample of n, i.e. n - 1 degrees of freedom."""
+    df = n - 1
+    if df < 1:
+        raise ValueError("an interval needs at least two observations")
+    if df in T_CRITICAL:
+        return T_CRITICAL[df]
+    # Cornish-Fisher expansion of the t quantile in terms of the normal one.
+    z = Z_975
+    return (
+        z
+        + (z ** 3 + z) / (4 * df)
+        + (5 * z ** 5 + 16 * z ** 3 + 3 * z) / (96 * df ** 2)
+        + (3 * z ** 7 + 19 * z ** 5 + 17 * z ** 3 - 15 * z) / (384 * df ** 3)
+    )
 
 
 def paired_difference(scores, category, a, b, only=None):

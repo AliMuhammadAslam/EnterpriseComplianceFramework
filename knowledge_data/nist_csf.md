@@ -18,7 +18,6 @@ Applicable to organizations of any size, sector, or maturity level. The framewor
 
 ### Identify (ID)
 - Asset management: Identify and manage physical and software assets
-- Business environment and objectives
 - Risk assessment: Identify cybersecurity risks to operations, assets, and individuals
 - Improvement: Identify improvements to organizational cybersecurity practices
 

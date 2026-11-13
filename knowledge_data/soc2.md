@@ -1,7 +1,7 @@
-# SOC 2 — Service Organization Control 2
+# SOC 2 — System and Organization Controls 2
 
 ## Overview
-SOC 2 (Service Organization Control Type 2) is a compliance framework developed by the American Institute of Certified Public Accountants (AICPA). It defines criteria for managing customer data based on five Trust Service Criteria (TSC). SOC 2 is primarily relevant to technology and cloud computing companies that store customer data.
+SOC 2 (part of the AICPA's System and Organization Controls suite; reports are issued as Type I or Type II) is a compliance framework developed by the American Institute of Certified Public Accountants (AICPA). It defines criteria for managing customer data based on five Trust Service Criteria (TSC). SOC 2 is primarily relevant to technology and cloud computing companies that store customer data.
 
 ## Scope
 Applies to service organizations that store, process, or transmit customer data, especially SaaS providers, data centers, managed IT services, and cloud-based businesses. SOC 2 Type I assesses design of controls at a point in time; Type II evaluates operational effectiveness over a period (typically 6-12 months).

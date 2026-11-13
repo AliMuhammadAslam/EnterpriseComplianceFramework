@@ -131,6 +131,105 @@ class TestStrategiesDiffer(unittest.TestCase):
         )
 
 
+def _words(n):
+    return " ".join(f"w{i}" for i in range(n))
+
+
+class TestNoRedundantTailChunk(unittest.TestCase):
+    """The last chunk must add words the previous one did not already hold.
+
+    The split loop used to step back by the overlap even after reaching the
+    end, so 950 words at size 500 / overlap 50 gave a third chunk, words
+    900-950, that sat entirely inside the second.
+    """
+
+    def split(self, n):
+        return _ChunkerOnly(kb.FIXED_SIZE)._split_text(_words(n), 500, 50)
+
+    def test_no_chunk_is_contained_in_the_one_before(self):
+        for n in (501, 520, 900, 950, 1000, 1349, 1350, 2000):
+            chunks = self.split(n)
+            for prev, cur in zip(chunks, chunks[1:]):
+                self.assertNotIn(cur, prev, f"redundant tail chunk at {n} words")
+
+    def test_every_word_is_still_covered(self):
+        for n in (501, 950, 1000, 1351):
+            covered = set(" ".join(self.split(n)).split())
+            self.assertEqual(covered, set(_words(n).split()))
+
+    def test_chunk_counts(self):
+        self.assertEqual(len(self.split(500)), 1)
+        self.assertEqual(len(self.split(950)), 2)
+        self.assertEqual(len(self.split(1000)), 3)
+
+
+class TestUploadChunker(unittest.TestCase):
+
+    def setUp(self):
+        from document_upload.chunker import DocumentChunker
+        self.Chunker = DocumentChunker
+
+    def test_no_redundant_tail_chunk(self):
+        chunker = self.Chunker(chunk_size=500, chunk_overlap=50)
+        for n in (520, 950, 1000, 1349):
+            chunks = chunker.chunk_text(_words(n))
+            spans = [(c["metadata"]["word_start"], c["metadata"]["word_end"]) for c in chunks]
+            for (s1, e1), (s2, e2) in zip(spans, spans[1:]):
+                self.assertFalse(s1 <= s2 and e2 <= e1, f"{spans} at {n} words")
+            self.assertEqual(spans[-1][1], n)
+
+    def test_explicit_zero_overlap_is_kept(self):
+        chunker = self.Chunker(chunk_size=100, chunk_overlap=0)
+        self.assertEqual(chunker.chunk_overlap, 0)
+        spans = [(c["metadata"]["word_start"], c["metadata"]["word_end"])
+                 for c in chunker.chunk_text(_words(300))]
+        self.assertEqual(spans, [(0, 100), (100, 200), (200, 300)])
+
+
+class TestHeadingOnlySections(unittest.TestCase):
+    """A heading with no body must not become a chunk of its own."""
+
+    TITLED = "# ISO 27001 — ISMS\n\n## Overview\nOverview body.\n\n## Scope\nScope body."
+
+    def chunks(self, text):
+        return _ChunkerOnly(kb.SECTION_AWARE)._chunk_document(text, "iso_27001.md")
+
+    def test_title_is_folded_into_the_next_section(self):
+        chunks = self.chunks(self.TITLED)
+        self.assertEqual(len(chunks), 2)
+        self.assertTrue(chunks[0]["text"].startswith("# ISO 27001"))
+        self.assertIn("Overview body.", chunks[0]["text"])
+        self.assertEqual(chunks[0]["metadata"]["section"], "Overview")
+
+    def test_no_chunk_is_only_headings(self):
+        text = "# Title\n\n## Empty\n\n## Also empty\n\n## Real\nBody text."
+        for chunk in self.chunks(text):
+            body = [l for l in chunk["text"].splitlines()
+                    if l.strip() and not l.lstrip().startswith("#")]
+            self.assertTrue(body, f"heading-only chunk: {chunk['text']!r}")
+
+    def test_trailing_heading_is_kept_not_dropped(self):
+        chunks = self.chunks("## Body\ntext\n\n## Trailing heading")
+        self.assertIn("Trailing heading", " ".join(c["text"] for c in chunks))
+
+    def test_real_corpus_has_no_heading_only_chunks_and_loses_no_words(self):
+        import glob
+        instance = _ChunkerOnly(kb.SECTION_AWARE)
+        for path in glob.glob(os.path.join("knowledge_data", "*.md")):
+            with open(path, encoding="utf-8") as f:
+                content = f.read()
+            chunks = instance._chunk_document(content, os.path.basename(path))
+            covered = set(" ".join(c["text"] for c in chunks).split())
+            self.assertEqual(set(content.split()) - covered, set(), path)
+            for c in chunks:
+                # A long section is split by word count and rejoined with
+                # spaces, so its body can sit on a line that starts with "#".
+                # Only a short line counts as a bare heading.
+                body = [l for l in c["text"].splitlines()
+                        if l.strip() and (not l.lstrip().startswith("#") or len(l) > 200)]
+                self.assertTrue(body, f"{path}: {c['text'][:60]!r}")
+
+
 class TestCorpusProvenance(unittest.TestCase):
     """Provenance from the manifest must reach the stored chunk metadata."""
 
@@ -148,7 +247,7 @@ class TestCorpusProvenance(unittest.TestCase):
 
     def test_unfilled_fields_are_omitted_not_none(self):
         # Chroma rejects None, so a blank effective date must not be written.
-        fields = self.kb._provenance_for("basel_framework.md")
+        fields = self.kb._provenance_for("cobit.md")
         self.assertNotIn("effective_date", fields)
         self.assertNotIn("version", fields)
         self.assertTrue(all(v for v in fields.values()))

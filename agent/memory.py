@@ -1,5 +1,7 @@
 import json
 import os
+import threading
+import uuid
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from pydantic import BaseModel
@@ -36,6 +38,15 @@ class Memory:
         # Per-user conversation history so follow-up questions stay scoped to
         # the user who asked them and don't leak across users.
         self.conversation_by_user: Dict[str, List[MemoryEntry]] = {}
+        # Interactions each user has reset away. Saved, so a restart does not
+        # bring back history the user asked to clear. Tracked by id rather
+        # than by reset time: the clock can give a message sent just after a
+        # reset the same timestamp as the reset itself.
+        self.cleared_ids: Dict[str, List[str]] = {}
+        # Requests run on parallel threads and every interaction is saved, so
+        # changes and saves are serialised. Without it, concurrent saves
+        # collided on the temporary file and most of them failed.
+        self._lock = threading.RLock()
         self._load_persistent_memory()
 
     def add_interaction(
@@ -47,15 +58,20 @@ class Memory:
     ):
         """Append a query-response pair to short-term and per-user memory."""
         entry = MemoryEntry(
-            id=f"interaction_{datetime.now().timestamp()}",
+            # Unique even for two interactions within one clock tick.
+            id=f"interaction_{uuid.uuid4().hex}",
             content={"query": query, "response": response},
             timestamp=datetime.now(),
             type="interaction",
             metadata=metadata,
             user_id=user_id,
         )
-        self.short_term_memory.append(entry)
-        self.conversation_by_user.setdefault(user_id, []).append(entry)
+        with self._lock:
+            self.short_term_memory.append(entry)
+            self.conversation_by_user.setdefault(user_id, []).append(entry)
+            # Saved straight away. Holding the session in memory until
+            # shutdown lost every conversation since start-up on a crash.
+            self._save_persistent_memory()
         self.logger.info(f"Added interaction to memory: {query[:50]}...")
 
     def get_conversation_history(
@@ -66,13 +82,42 @@ class Memory:
         recent = [e for e in entries if e.type == "interaction"][-limit:]
         return [e.content for e in recent]
 
+    def get_recent_interactions(
+        self, user_id: str, limit: int = 50
+    ) -> List[Dict[str, Any]]:
+        """This user's latest exchanges, oldest first, with when they happened.
+
+        For redisplaying the conversation after a page reload; a reset
+        conversation is already gone from conversation_by_user.
+        """
+        with self._lock:
+            entries = [
+                e for e in self.conversation_by_user.get(user_id, [])
+                if e.type == "interaction"
+            ][-limit:]
+            return [
+                {
+                    "query": e.content.get("query", ""),
+                    "response": e.content.get("response", ""),
+                    "timestamp": e.timestamp.isoformat(),
+                }
+                for e in entries
+            ]
+
     def clear_user_conversation(self, user_id: str = "default"):
         """Clear only this user's follow-up conversation history.
 
         Scoped to one user so resetting one person's session doesn't wipe
-        everyone else's conversation context.
+        everyone else's conversation context. The cleared interactions are
+        recorded and skipped when history is rebuilt, so the reset holds
+        across a restart; the interactions themselves are kept on disk.
         """
-        self.conversation_by_user.pop(user_id, None)
+        with self._lock:
+            cleared = self.conversation_by_user.pop(user_id, [])
+            ids = set(self.cleared_ids.get(user_id, []))
+            ids.update(entry.id for entry in cleared)
+            self.cleared_ids[user_id] = sorted(ids)
+            self._save_persistent_memory()
         self.logger.info(f"Cleared conversation history for user: {user_id}")
 
     def start_new_session(self):
@@ -92,6 +137,10 @@ class Memory:
             self.logger.info("No active session to end")
 
     def _save_current_session_to_long_term(self):
+        with self._lock:
+            self._close_session_locked()
+
+    def _close_session_locked(self):
         if not self.short_term_memory:
             return
 
@@ -111,9 +160,13 @@ class Memory:
             },
         )
 
+        count = len(self.short_term_memory)
         self.long_term_memory.append(session_entry)
+        # Cleared before saving, or the file would hold these interactions
+        # both in the session and as an unfinished one, restored twice.
+        self.short_term_memory = []
         self._save_persistent_memory()
-        self.logger.info(f"Saved session with {len(self.short_term_memory)} interactions")
+        self.logger.info(f"Saved session with {count} interactions")
 
     def _load_persistent_memory(self):
         if os.path.exists(self.memory_file):
@@ -123,6 +176,14 @@ class Memory:
                 self.long_term_memory = [
                     MemoryEntry(**entry) for entry in data.get("long_term", [])
                 ]
+                self.cleared_ids = dict(data.get("cleared_ids", {}))
+                # Interactions saved during a session that never ended
+                # cleanly. Kept as a session of their own so they are restored.
+                self.short_term_memory = [
+                    MemoryEntry(**entry) for entry in data.get("current_session", [])
+                ]
+                if self.short_term_memory:
+                    self._save_current_session_to_long_term()
                 self._rebuild_user_conversations()
                 self.logger.info(
                     f"Loaded {len(self.long_term_memory)} long-term memories, "
@@ -138,6 +199,7 @@ class Memory:
         follow-up question loses the exchange it refers to.
         """
         restored: Dict[str, List[MemoryEntry]] = {}
+        cleared = {user: set(ids) for user, ids in self.cleared_ids.items()}
 
         for session in self.long_term_memory:
             if session.type != "conversation_session":
@@ -148,8 +210,11 @@ class Memory:
                 except Exception as e:
                     self.logger.warning(f"Skipped an unreadable interaction: {e}")
                     continue
-                if entry.type == "interaction":
-                    restored.setdefault(entry.user_id, []).append(entry)
+                if entry.type != "interaction":
+                    continue
+                if entry.id in cleared.get(entry.user_id, ()):
+                    continue
+                restored.setdefault(entry.user_id, []).append(entry)
 
         for entries in restored.values():
             entries.sort(key=lambda e: e.timestamp)
@@ -157,10 +222,21 @@ class Memory:
         self.conversation_by_user = restored
 
     def _save_persistent_memory(self):
+        with self._lock:
+            self._write_file_locked()
+
+    def _write_file_locked(self):
+        tmp_path = f"{self.memory_file}.tmp"
         try:
-            data = {"long_term": [e.model_dump() for e in self.long_term_memory]}
-            with open(self.memory_file, "w", encoding="utf-8") as f:
+            data = {
+                "long_term": [e.model_dump() for e in self.long_term_memory],
+                "current_session": [e.model_dump() for e in self.short_term_memory],
+                "cleared_ids": self.cleared_ids,
+            }
+            # Write then swap, so an interrupted save cannot truncate the file.
+            with open(tmp_path, "w", encoding="utf-8") as f:
                 json.dump(data, f, default=str, indent=2)
+            os.replace(tmp_path, self.memory_file)
             self.logger.info("Saved persistent memory")
         except Exception as e:
             self.logger.error(f"Failed to save memory: {e}")

@@ -1,7 +1,7 @@
 # PSD2 — Payment Services Directive 2 and Open Banking
 
 ## Overview
-The Payment Services Directive 2 (PSD2) is the European Union regulation (Directive 2015/2366) governing electronic payment services. It entered into force in January 2018 and replaced the original PSD. PSD2 introduced regulatory requirements for third-party payment providers, mandated Strong Customer Authentication (SCA), and established the legal basis for Open Banking. While PSD2 is EU legislation, its principles influence global fintech regulation, including Pakistan's evolving open banking and payment system frameworks.
+The Payment Services Directive 2 (PSD2) is a European Union directive, Directive (EU) 2015/2366 of 25 November 2015, governing electronic payment services. It was published in the Official Journal on 23 December 2015 and entered into force on the twentieth day after publication (Article 116); Member States had to apply it from 13 January 2018 (Article 115). It replaced the original PSD. PSD2 introduced regulatory requirements for third-party payment providers, mandated Strong Customer Authentication (SCA), and established the legal basis for Open Banking. While PSD2 is EU legislation, its principles influence global fintech regulation, including Pakistan's evolving open banking and payment system frameworks.
 
 ## Scope
 Applies to all payment service providers operating within the European Economic Area (EEA), including banks, EMIs, payment institutions, and third-party providers (TPPs). Relevant globally as a benchmark for open banking regulation in other jurisdictions.
@@ -36,7 +36,7 @@ PSD2 mandates that banks (Account Servicing Payment Service Providers — ASPSPs
 - Defines technical requirements for SCA implementation
 - Specifies API interface requirements for TPP access
 - Fallback mechanism: if dedicated interface unavailable, TPPs may use the customer-facing interface
-- 90-day re-authentication for account access
+- Re-authentication with strong customer authentication when more than 180 days have elapsed since it was last applied, for account information accessed directly or through an account information service provider (RTS Articles 10 and 10a, as amended by Commission Delegated Regulation (EU) 2022/2360; the period was previously 90 days)
 - Transaction risk analysis exemption (Transaction Risk Analysis — TRA) up to EUR 500 based on fraud rate thresholds
 
 ## Open Banking Standards
@@ -52,7 +52,6 @@ PSD2 mandates that banks (Account Servicing Payment Service Providers — ASPSPs
 - Granular consent: specific accounts, data types, and duration
 - Consent revocation at any time
 - Consent dashboard: customers can view and manage active consents
-- Maximum consent duration: 90 days (re-authorization required)
 
 ### Security Requirements
 - Qualified Website Authentication Certificates (QWACs) for mutual TLS
@@ -64,9 +63,9 @@ PSD2 mandates that banks (Account Servicing Payment Service Providers — ASPSPs
 ## Consumer Protection
 
 ### Liability for Unauthorized Transactions
-- Maximum customer liability for unauthorized payments: EUR 50 (reduced from EUR 150 under PSD1)
-- Zero liability in case of gross negligence by the PSP
-- Refund within 1 business day for unauthorized transactions
+- The payer may be obliged to bear losses from unauthorised transactions up to a maximum of EUR 50 where they result from a lost, stolen or misappropriated payment instrument; this does not apply if the loss was not detectable to the payer before the payment, or was caused by the payment service provider's employees, agents, branches or outsourced entities (Article 74(1))
+- The payer bears all losses if they acted fraudulently or failed to fulfil their Article 69 obligations with intent or gross negligence; the EUR 50 cap then does not apply (Article 74(1))
+- Refund of unauthorised transactions immediately, and in any event no later than by the end of the following business day after noting or being notified of the transaction (Article 73(1))
 - Right to dispute and provisional refund
 
 ### Transparency Requirements

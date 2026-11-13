@@ -46,24 +46,58 @@ class DocumentParser:
             raise
 
     def _parse_docx(self, file_path: str) -> str:
-        """Extract text from DOCX using python-docx."""
+        """Extract text from DOCX using python-docx.
+
+        Paragraphs and tables are read in document order. Reading paragraphs
+        alone dropped every table, and policies often list their controls in
+        tables, so an evaluation reported gaps for controls that were there.
+        """
         try:
             from docx import Document
+            from docx.table import Table
+            from docx.text.paragraph import Paragraph
 
             doc = Document(file_path)
             text_parts = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text_parts.append(paragraph.text)
+            tables = 0
+            for block in doc.element.body.iterchildren():
+                if block.tag.endswith("}p"):
+                    paragraph_text = Paragraph(block, doc).text
+                    if paragraph_text.strip():
+                        text_parts.append(paragraph_text)
+                elif block.tag.endswith("}tbl"):
+                    tables += 1
+                    table_text = self._docx_table_text(Table(block, doc))
+                    if table_text:
+                        text_parts.append(table_text)
             text = "\n\n".join(text_parts)
             self.logger.info(
                 f"Parsed DOCX: {os.path.basename(file_path)} "
-                f"({len(doc.paragraphs)} paragraphs, {len(text)} chars)"
+                f"({len(doc.paragraphs)} paragraphs, {tables} tables, {len(text)} chars)"
             )
             return text
         except Exception as e:
             self.logger.error(f"Error parsing DOCX {file_path}: {e}")
             raise
+
+    def _docx_table_text(self, table) -> str:
+        """One line per row, cells separated by " | ".
+
+        A merged cell is returned once per row it spans, so a repeat of the
+        cell before it is skipped. cell.text holds only the cell's own
+        paragraphs, so a table nested in a cell is read separately.
+        """
+        rows = []
+        for row in table.rows:
+            cells = []
+            for cell in row.cells:
+                parts = [cell.text] + [self._docx_table_text(t) for t in cell.tables]
+                value = " ".join(" ".join(parts).split())
+                if value and (not cells or cells[-1] != value):
+                    cells.append(value)
+            if cells:
+                rows.append(" | ".join(cells))
+        return "\n".join(rows)
 
     def _parse_txt(self, file_path: str) -> str:
         """Read plain text file."""

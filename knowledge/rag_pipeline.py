@@ -53,18 +53,34 @@ class RAGPipeline:
         query: str,
         collection_name: str = KNOWLEDGE_COLLECTION,
         top_k: Optional[int] = None,
+        source: Optional[str] = None,
     ) -> str:
         """Retrieve context only from a regulatory knowledge collection.
 
         collection_name and top_k are overridable so ablation runs can vary
-        them without touching the default path.
+        them without touching the default path. source restricts retrieval to
+        one corpus file.
         """
+        context, _ = self.retrieve_knowledge_with_results(
+            query, collection_name=collection_name, top_k=top_k, source=source
+        )
+        return context
+
+    def retrieve_knowledge_with_results(
+        self,
+        query: str,
+        collection_name: str = KNOWLEDGE_COLLECTION,
+        top_k: Optional[int] = None,
+        source: Optional[str] = None,
+    ) -> tuple:
+        """Same as retrieve_knowledge_only, but also returns the raw chunks."""
         results = self.vector_store.query_knowledge(
             query,
             top_k=top_k or self.top_k,
             collection_name=collection_name,
+            source=source,
         )
-        return self._format_section("Regulatory Knowledge Base", results)
+        return self._format_section("Regulatory Knowledge Base", results), results
 
     def retrieve_company_docs_only(
         self, user_id: str, query: str, doc_ids: Optional[List[str]] = None
@@ -79,6 +95,49 @@ class RAGPipeline:
             user_id, query, top_k=self.top_k, doc_ids=doc_ids
         )
         return self._format_section("Company Documents", results)
+
+    def retrieve_company_docs_for_queries(
+        self,
+        user_id: str,
+        queries: List[str],
+        doc_ids: Optional[List[str]] = None,
+    ) -> str:
+        """Retrieve company chunks for several queries, without duplicates.
+
+        One query returning top_k chunks covered only a few sections of a
+        long policy, so an evaluation across many standards reported gaps for
+        content that existed but was never retrieved.
+        """
+        context, _ = self.retrieve_company_docs_for_queries_with_results(
+            user_id, queries, doc_ids=doc_ids
+        )
+        return context
+
+    def retrieve_company_docs_for_queries_with_results(
+        self,
+        user_id: str,
+        queries: List[str],
+        doc_ids: Optional[List[str]] = None,
+    ) -> tuple:
+        """Same as retrieve_company_docs_for_queries, plus the raw chunks."""
+        seen = set()
+        merged = []
+        batches = self.vector_store.query_company_documents_batch(
+            user_id, queries, top_k=self.top_k, doc_ids=doc_ids
+        )
+        for batch in batches:
+            for result in batch:
+                metadata = result.get("metadata", {}) or {}
+                key = (
+                    metadata.get("doc_id"),
+                    metadata.get("chunk_index"),
+                    result.get("content", ""),
+                )
+                if key in seen:
+                    continue
+                seen.add(key)
+                merged.append(result)
+        return self._format_section("Company Documents", merged), merged
 
     def _format_context(
         self,

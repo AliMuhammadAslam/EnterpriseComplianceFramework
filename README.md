@@ -184,7 +184,7 @@ Every user query follows a fixed pipeline:
 | 4 | **Executor** | Executes each plan step sequentially, injecting RAG context into every LLM call |
 | 5 | **Memory** | Stores the interaction in per-user session memory and persists it to `agent_memory.json` |
 
-Conversation memory is scoped per user, so follow-up questions keep their context and one user's session reset never affects another user's history.
+Conversation memory is scoped per user, so follow-up questions keep their context and one user's session reset never affects another user's history. Each interaction is written to disk as it happens, so a crash does not lose the conversation, and a reset is recorded so it still holds after a restart.
 
 ### RAG & Knowledge Layer
 - **Regulatory KB**: Eighteen authoritative compliance standards pre-loaded from `knowledge_data/` into a shared `regulatory_knowledge` ChromaDB collection on first startup.
@@ -213,14 +213,18 @@ Every system action is recorded to `audit_logs/audit_log.jsonl` via the `AuditLo
 The audit log supports filtering by `action`, `resource_type`, timestamp range, and status. Each user's queries and export are scoped to their own actions.
 
 ### Report Store
-Evaluation reports are persisted as JSON files under `reports/{user_id}/{report_id}.json` by `ReportStore`. Reports can be listed, retrieved, downloaded as Markdown, or deleted via the API.
+Evaluation reports are persisted as JSON files under `reports/{user_id}/{report_id}.json` by `ReportStore`. Reports can be listed, retrieved, downloaded as Markdown, or deleted via the API. Each report records the `trace_id` of the evidence trace it was built from.
 
 ### Compliance Evaluation Engine
 Triggered via the `/evaluate` endpoint or the web UI. The engine:
-1. Retrieves the user's company documents via RAG, optionally restricted to specific selected documents
-2. Retrieves the relevant regulatory standards via one query per standard, which avoids similarity crowding
+1. Retrieves regulatory context with one query per standard, restricted to that standard's own file in `knowledge_data/`, so each standard's section is built from that standard rather than from whichever documents rank highest overall
+2. Searches the user's company documents using the text of those retrieved requirements as queries, optionally restricted to specific selected documents, so each requirement is matched against the parts of the policy that address it
 3. Sends a structured prompt to the LLM for gap analysis at temperature 0
-4. Returns a formatted Markdown report
+4. Recomputes every row of the risk score table from its S, L and G values and corrects any score, band or escalation marker that disagrees with the scoring rule
+5. Checks every cited identifier against the retrieved context
+6. Writes an evidence trace of the chunks, steps and check results, and returns the Markdown report
+
+If the regulatory context for a standard cannot be retrieved, or the model call fails, the evaluation stops with an error rather than saving a report with nothing behind it.
 
 The report covers:
 - **Executive Summary**
@@ -230,6 +234,8 @@ The report covers:
 - **Risk Assessment** (likelihood and impact)
 - **Regulatory Risk Score and Prioritization**: a transparent score per gap computed as Obligation Severity x Likelihood x Adequacy Gap, sorted highest to lowest
 - **Recommendations** ordered by priority with effort estimates
+- **Risk Score Check**: how many scoring rows were recomputed and any that were corrected, so a correction is visible rather than silent
+- **Citation Validation**: which cited identifiers were found in the retrieved context, and which were not
 
 An evaluation can target up to ten standards at a time, which keeps report generation within the model's token budget.
 
@@ -265,7 +271,7 @@ An evaluation can target up to ten standards at a time, which keeps report gener
 - the model and embedding snapshot in use
 - the request seed and the returned system fingerprint, since OpenAI states that a fixed seed makes repeated requests more likely to match but does not guarantee it, and recommends watching the fingerprint for backend changes
 - a SHA-256 hash of the regulatory corpus, so a change to `knowledge_data/` is detectable
-- the installed package versions and the current git commit
+- the installed package versions, the current git commit, and whether the working tree had uncommitted changes (`git_dirty`, with the files listed), since a commit hash alone does not show edits made on top of it
 
 Temperature zero reduces sampling variability on its own but does not make a hosted model fully deterministic, which is why the seed and fingerprint are tracked as well.
 
@@ -286,7 +292,7 @@ The `evaluation/` directory also holds the scripts used to produce the benchmark
 
 Run any of them with `python -m evaluation.<script_name>`. Results are written to `evaluation/results/`, which **is** tracked in this repository, so the per-question scores, run manifests and retrieved contexts behind every reported figure are held alongside the code rather than archived elsewhere.
 
-`analysis.py` regenerates the reported performance and paired-difference tables from the stored per-question scores. `citation_audit.py` re-checks each cited identifier against the context that answer actually received, read from the exported contexts for the run rather than re-retrieved, so a later correction to a source document cannot silently change the figures reported for a run that never used it.
+`analysis.py` regenerates the reported performance and paired-difference tables from the stored per-question scores. `citation_audit.py` re-checks each cited identifier against the context that answer actually received, read from the export made for that same run rather than re-retrieved, so a later correction to a source document cannot silently change the figures reported for a run that never used it. Where a run has no export, the audit and `export_contexts.py` rebuild contexts only if the corpus hash still matches the one recorded for the run, and refuse otherwise.
 
 Both default to the development run that the reported tables come from and name any other runs present. Pass a results path explicitly to audit a different run. Each run manifest records the corpus hash and git commit in force at the time, so the provenance of a figure stays readable even after the corpus or the code moves on.
 
@@ -298,7 +304,7 @@ Both default to the development run that the reported tables come from and name 
 python -m unittest discover -s tests
 ```
 
-101 tests across six files, covering audit log hash chaining and tamper detection, citation validation, evidence trace redaction, upload hardening (including the directory traversal fix), and cross-tenant data isolation. The isolation and audit-lock tests were checked for sensitivity by deliberately injecting a fault and confirming the tests catch it, rather than assumed to be meaningful.
+309 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
 
 ---
 
@@ -348,12 +354,20 @@ OPENAI_API_KEY=your-openai-api-key-here
 SECRET_KEY=change-this-to-a-long-random-string
 USERS_FILE=./users.json
 
+# Sign-in and session security
+LOGIN_MAX_ATTEMPTS=5
+LOGIN_IP_MAX_ATTEMPTS=20
+LOGIN_LOCKOUT_MINUTES=15
+SESSION_IDLE_MINUTES=30
+SESSION_MAX_HOURS=8
+SESSION_COOKIE_SECURE=false
+TRUSTED_ORIGINS=
+
 # LLM Settings
 DEFAULT_MODEL=gpt-4o-2024-08-06
 SEED=42
 TEMPERATURE=0.0
 MAX_TOKENS=6000
-MAX_ITERATIONS=5
 
 # Memory
 MEMORY_FILE=agent_memory.json
@@ -371,18 +385,23 @@ KNOWLEDGE_BASE_PATH=./knowledge_data
 # Document Upload
 UPLOAD_DIR=./uploads
 MAX_UPLOAD_SIZE_MB=50
+MAX_PDF_PAGES=500
+MAX_DOCX_PARAGRAPHS=20000
+MAX_EXTRACTED_CHARS=2000000
 
-# Reports & Audit
+# Reports, Audit & Evidence
 REPORTS_DIR=./reports
 AUDIT_LOG_DIR=./audit_logs
-
-# Logging
-LOG_LEVEL=INFO
+EVIDENCE_TRACE_DIR=./evidence_traces
 ```
+
+Only `OPENAI_API_KEY` and `SECRET_KEY` must be set; every other value above is the default the code uses when the variable is absent.
 
 > Set `SECRET_KEY` to a long random value. It signs the session cookie, so keep it private and out of version control.
 
-> On first startup the system ingests all files from `knowledge_data/` into ChromaDB. It also re-ingests automatically whenever those files change, so no manual steps are needed after updating a knowledge file.
+**Security controls.** Repeated failed sign-ins lock the account (and, at a higher threshold, the address) for 15 minutes, and each lockout is recorded in the audit trail. Sessions end after 30 minutes of inactivity or 8 hours in total. State-changing requests that come from another website are refused, and every response carries basic browser protections against content sniffing, framing (clickjacking) and referrer leakage. When serving over HTTPS, set `SESSION_COOKIE_SECURE=true`. The lockout counters are held in memory, so they reset when the app restarts.
+
+> On first startup the system ingests all files from `knowledge_data/` into ChromaDB. It re-ingests automatically whenever a knowledge file, a file name, `corpus_manifest.json`, the chunk settings or the embedding model change, and chunks from removed or shortened files are deleted, so no manual steps are needed after updating a knowledge file.
 
 ---
 
@@ -429,7 +448,7 @@ Optional flags:
 ## Using the Web Interface
 
 ### Chat
-Ask any compliance-related question in the chat panel. The agent retrieves relevant regulatory context and your uploaded company documents before responding.
+Ask any compliance-related question in the chat panel. The agent retrieves relevant regulatory context and your uploaded company documents before responding. Your recent conversation is shown again after a page reload, until you reset the session, and each answer has a **Copy** link that copies it as Markdown.
 
 **Example queries:**
 - *What are the key requirements of GDPR Article 32?*
@@ -437,7 +456,7 @@ Ask any compliance-related question in the chat panel. The agent retrieves relev
 - *What controls does ISO 27001 require for access management?*
 
 ### Document Upload
-Drag and drop, or click to browse, a company document (PDF, DOCX, or TXT, max 50 MB) into the upload panel. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
+Drag and drop, or click to browse, one or more company documents (PDF, DOCX, or TXT, max 50 MB each) into the upload panel; several files are uploaded one after another, each with its own result. DOCX tables are read along with the paragraphs, in document order. Once processed, the document is chunked, embedded, and stored in your user-scoped vector collection and will be referenced automatically in subsequent chat queries and evaluations.
 
 Uploaded files are treated as untrusted input. The filename is reduced to a bare basename before it touches any path, which closes a directory traversal issue found during testing where a crafted filename could write outside the user's own upload folder. The file's contents are checked against its claimed extension, so a renamed executable is rejected rather than parsed. Page count, paragraph count, and extracted character count are capped before parsing. Text inside a document that addresses the model rather than the reader is marked and left in place, since silently deleting it would hide part of the document being assessed. These checks reduce the attack surface but do not eliminate prompt injection.
 
@@ -455,6 +474,11 @@ The system retrieves your selected documents and the relevant regulatory standar
 - A regulatory risk score and prioritization table
 - Prioritised recommendations (with effort estimates)
 
+The top of each report shows a short summary counted from its own tables: how many standards had findings, documentation gaps or were not applicable, and how many gaps fall in each priority band. A report can be opened from the chat or from **Report History**, copied, downloaded as Markdown, or printed (the browser's print dialog also offers Save as PDF).
+
+### Audit Trail and Accessibility
+The **Audit Trail** panel can be filtered by action, or to failures only. The interface follows the system's light or dark setting, and can be used with the keyboard: dialogs close with Escape and keep focus inside while open, and the upload area and report list respond to Enter.
+
 ---
 
 ## REST API Reference
@@ -466,6 +490,7 @@ All data endpoints require an authenticated session. Requests without a valid se
 | `GET` / `POST` | `/login` | Show the login page (GET) or authenticate a username and password (POST) |
 | `POST` | `/logout` | Clear the session |
 | `POST` | `/chat` | Send a message; body: `{message, verbose}` |
+| `GET` | `/chat/history` | The current user's recent chat exchanges (up to 50), oldest first |
 | `POST` | `/upload` | Upload a document; multipart form: `file` |
 | `GET` | `/documents` | List documents uploaded by the current user |
 | `DELETE` | `/documents/<doc_id>` | Delete a specific document and its vector chunks |
@@ -506,6 +531,13 @@ All settings are controlled via environment variables with sensible defaults bui
 | `OPENAI_API_KEY` | required | OpenAI API key |
 | `SECRET_KEY` | required | Secret used to sign the session cookie. The app refuses to start without it; there is no fallback value |
 | `USERS_FILE` | `./users.json` | Path to the seeded user account store |
+| `LOGIN_MAX_ATTEMPTS` | `5` | Failed sign-ins for one account before it is locked |
+| `LOGIN_IP_MAX_ATTEMPTS` | `20` | Failed sign-ins from one address before it is locked |
+| `LOGIN_LOCKOUT_MINUTES` | `15` | How long a lockout lasts after the last failed attempt |
+| `SESSION_IDLE_MINUTES` | `30` | A session ends after this long without activity |
+| `SESSION_MAX_HOURS` | `8` | A session ends after this long in total, even if active |
+| `SESSION_COOKIE_SECURE` | `false` | Set to `true` when the app is served over HTTPS, so the session cookie is only sent encrypted |
+| `TRUSTED_ORIGINS` | empty | Comma-separated extra origins (`https://host:port`) allowed to send requests, for a deployment whose public address differs from the Host header |
 | `DEFAULT_MODEL` | `gpt-4o-2024-08-06` | Dated model snapshot (any litellm-supported model; avoid moving aliases like `gpt-4o`) |
 | `SEED` | `42` | Request seed passed to every completion call |
 | `TEMPERATURE` | `0.0` | LLM temperature; 0 reduces sampling variability but does not guarantee determinism on its own |
@@ -517,8 +549,11 @@ All settings are controlled via environment variables with sensible defaults bui
 | `RAG_TOP_K` | `5` | Number of chunks retrieved per RAG query |
 | `KNOWLEDGE_BASE_PATH` | `./knowledge_data` | Directory for regulatory Markdown files |
 | `UPLOAD_DIR` | `./uploads` | Directory for user-uploaded documents |
-| `MAX_UPLOAD_SIZE_MB` | `50` | Maximum upload file size |
+| `MAX_UPLOAD_SIZE_MB` | `50` | Maximum upload file size; larger requests are refused before they are read |
+| `MAX_PDF_PAGES` | `500` | Maximum pages in an uploaded PDF |
+| `MAX_DOCX_PARAGRAPHS` | `20000` | Maximum paragraphs in an uploaded DOCX |
+| `MAX_EXTRACTED_CHARS` | `2000000` | Maximum text extracted from one upload |
 | `REPORTS_DIR` | `./reports` | Directory for persisted evaluation reports |
 | `AUDIT_LOG_DIR` | `./audit_logs` | Directory for audit trail log files |
+| `EVIDENCE_TRACE_DIR` | `./evidence_traces` | Directory for evidence traces of chat answers and evaluations |
 | `MEMORY_FILE` | `agent_memory.json` | Path for long-term memory persistence |
-| `LOG_LEVEL` | `INFO` | Logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |

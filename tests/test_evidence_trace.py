@@ -58,6 +58,15 @@ class TestRedaction(unittest.TestCase):
         text = "steps 1 2 3 4 5 6 7 8 9 10 11 12 13 14"
         self.assertEqual(redact(text), text)
 
+    def test_year_ranges_are_not_treated_as_cards(self):
+        # Card-shaped but failing the card checksum, so not a card number.
+        for text in ("applies 2019-2020-2021-2022", "audits 2016 2017 2018 2019"):
+            self.assertEqual(redact(text), text)
+
+    def test_dashed_and_unspaced_card_numbers_are_still_redacted(self):
+        self.assertIn("[REDACTED:card]", redact("card 5500-0000-0000-0004 on file"))
+        self.assertIn("[REDACTED:card]", redact("card 4111111111111111 on file"))
+
     def test_empty_input_is_safe(self):
         self.assertEqual(redact(""), "")
 

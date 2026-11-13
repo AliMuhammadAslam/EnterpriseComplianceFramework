@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ComplianceAI - Enterprise Compliance Framework</title>
     <meta name="description" content="AI-powered compliance evaluation platform for fintech organizations. Evaluate security posture against ISO 27001, SOC 2, GDPR, NIST, PCI DSS, and more.">
+    <script>
+        // Apply a saved light/dark choice before the page draws, so it does
+        // not flash in the other theme. Storage can be blocked; then the
+        // page simply follows the system setting.
+        try {
+            const theme = localStorage.getItem('complianceai-theme');
+            if (theme === 'light' || theme === 'dark') document.documentElement.dataset.theme = theme;
+        } catch (e) { /* follow the system setting */ }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -347,6 +356,8 @@
         .btn-success:hover { filter: brightness(1.1); transform: translateY(-1px); }
         .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
 
+        .eval-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+
         /* Audit log panel */
         .audit-log-list { max-height: 200px; overflow-y: auto; }
 
@@ -592,6 +603,8 @@
         .agent-message .msg-bubble h1 { font-size: 1.2rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
         .agent-message .msg-bubble h2 { font-size: 1.05rem; font-weight: 700; margin: 0.5rem 0 0.3rem; color: var(--accent); }
         .agent-message .msg-bubble h3 { font-size: 0.92rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
+        .agent-message .msg-bubble h4 { font-size: 0.88rem; font-weight: 600; margin: 0.35rem 0 0.15rem; color: var(--text-secondary); }
+        .agent-message .msg-bubble a, .modal-report-content a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
         .agent-message .msg-bubble p { margin: 0.2rem 0; }
         .agent-message .msg-bubble ul, .agent-message .msg-bubble ol { padding-left: 1.3rem; margin: 0.2rem 0; }
         .agent-message .msg-bubble li { margin-bottom: 0.1rem; }
@@ -682,6 +695,10 @@
             animation: typingBounce 1.4s ease infinite;
         }
 
+        .typing-label { font-size: 0.75rem; color: var(--text-muted); margin-left: 0.5rem; }
+
+        .report-actions { display: flex; gap: 0.5rem; margin-top: 0.5rem; }
+
         .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
         .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
 
@@ -769,7 +786,7 @@
 
         .toast.success { background: var(--success); color: white; }
         .toast.error { background: var(--error); color: white; }
-        .toast.info { background: var(--warning); color: white; }
+        .toast.info { background: var(--accent); color: white; }
 
         .info-card {
             display: block;
@@ -793,7 +810,7 @@
         }
 
         .logs-bar.collapsed { height: 36px; }
-        .logs-bar.expanded { height: 70vh; }
+        .logs-bar.expanded { height: 45vh; }
 
         .logs-header {
             display: flex;
@@ -887,8 +904,8 @@
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow-lg);
             padding: 1.5rem;
-            min-width: 320px;
-            max-width: 480px;
+            min-width: min(320px, calc(100vw - 2rem));
+            max-width: min(480px, calc(100vw - 2rem));
             animation: scaleIn 0.15s ease;
         }
 
@@ -959,6 +976,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 0.75rem;
             padding: 1rem 1.25rem;
             border-bottom: 1px solid var(--border);
             flex-shrink: 0;
@@ -968,6 +986,8 @@
             display: flex;
             gap: 0.5rem;
             align-items: center;
+            flex-wrap: wrap;
+            justify-content: flex-end;
         }
 
         .btn-modal-download {
@@ -1023,6 +1043,7 @@
         .modal-report-content h1 { font-size: 1.2rem; font-weight: 700; margin: 0.6rem 0 0.3rem; }
         .modal-report-content h2 { font-size: 1.05rem; font-weight: 700; margin: 0.5rem 0 0.3rem; color: var(--accent); }
         .modal-report-content h3 { font-size: 0.92rem; font-weight: 600; margin: 0.4rem 0 0.2rem; }
+        .modal-report-content h4 { font-size: 0.88rem; font-weight: 600; margin: 0.35rem 0 0.15rem; color: var(--text-secondary); }
         .modal-report-content p { margin: 0.3rem 0; }
         .modal-report-content ul, .modal-report-content ol { padding-left: 1.3rem; margin: 0.3rem 0; }
         .modal-report-content li { margin-bottom: 0.15rem; }
@@ -1038,7 +1059,7 @@
         .risk-high     { background:#fff1e6; color:#c0531c; border:1px solid #ffd1b3; }
         .risk-medium   { background:#fff8e1; color:#8a6d00; border:1px solid #ffe7a3; }
         .risk-low      { background:#e9f7ef; color:#1e7e44; border:1px solid #bfe6cd; }
-        .prio-badge    { display:inline-block; padding:0.05rem 0.5rem; border-radius:10px; font-size:0.8rem; font-weight:600; background:var(--bg-surface-alt); color:var(--text); border:1px solid var(--border); white-space:nowrap; }
+        .prio-badge    { display:inline-block; padding:0.05rem 0.5rem; border-radius:10px; font-size:0.8rem; font-weight:600; background:var(--bg-surface-alt); color:var(--text-primary); border:1px solid var(--border); white-space:nowrap; }
 
         /* Standards tooltip in report history */
         .std-tooltip-wrapper {
@@ -1078,6 +1099,216 @@
         a:focus:not(:focus-visible),
         button:focus:not(:focus-visible) { outline: none; }
 
+        /* Read by screen readers, not shown */
+        .sr-only {
+            position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+            overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+        }
+
+        .empty-state { font-size: 0.75rem; color: var(--text-muted); }
+
+        .btn-reset {
+            background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.3rem 0.6rem; font-size: 0.72rem; cursor: pointer; color: var(--text-secondary);
+            font-family: inherit;
+        }
+
+        .btn-logout {
+            background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 6px;
+            padding: 0.3rem 0.55rem; font-size: 0.95rem; cursor: pointer;
+            color: rgba(255,255,255,0.7); margin-left: auto;
+        }
+
+        /* Copy link under each agent message */
+        .msg-copy-btn {
+            background: none; border: none; padding: 0; margin-left: 0.5rem;
+            font-family: inherit; font-size: 0.65rem; color: var(--text-muted); cursor: pointer;
+        }
+        .msg-copy-btn:hover { color: var(--accent); text-decoration: underline; }
+
+        /* Marks where the restored conversation ends */
+        .history-divider {
+            display: flex; align-items: center; gap: 0.75rem; margin: 0.25rem 0 1.25rem;
+            font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .history-divider::before, .history-divider::after {
+            content: ""; flex: 1; border-top: 1px solid var(--border);
+        }
+
+        /* Audit trail filters (dark sidebar) */
+        .audit-filters { display: flex; gap: 0.5rem; align-items: center; margin-bottom: 0.5rem; }
+        .audit-filters select {
+            flex: 1; min-width: 0; padding: 0.3rem 0.4rem;
+            background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius-sm); color: var(--text-inverse);
+            font-family: inherit; font-size: 0.72rem;
+        }
+        .audit-filters label {
+            display: flex; align-items: center; gap: 0.3rem; white-space: nowrap;
+            font-size: 0.7rem; color: var(--text-muted); cursor: pointer;
+        }
+        .audit-filters input[type="checkbox"] { accent-color: var(--accent); }
+
+        /* Counts drawn from a report's own tables */
+        .report-summary {
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-surface-alt); padding: 0.6rem 0.8rem; margin-bottom: 0.8rem;
+            font-size: 0.8rem; line-height: 1.7;
+        }
+        .report-summary-title {
+            font-size: 0.68rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text-muted);
+        }
+        .report-summary-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.5rem; }
+        .report-summary-label { font-weight: 600; margin-right: 0.15rem; }
+
+        /* Report History: the date opens the report; looks like plain text */
+        .report-open-btn {
+            background: none; border: none; padding: 0; margin: 0;
+            font: inherit; color: rgba(255,255,255,0.8); text-align: left; cursor: pointer;
+        }
+
+        /* A wide table scrolls inside its message instead of running past it */
+        .msg-bubble { overflow-x: auto; }
+
+        /* Line icons (the symbols are defined once at the top of <body>) */
+        .icon {
+            width: 1em; height: 1em; flex-shrink: 0; vertical-align: -0.125em;
+            fill: none; stroke: currentColor; stroke-width: 2;
+            stroke-linecap: round; stroke-linejoin: round;
+        }
+        .panel-toggle .panel-title { display: inline-flex; align-items: center; gap: 0.55rem; }
+        .panel-toggle .panel-title .icon { font-size: 0.95rem; color: var(--text-muted); }
+        .sidebar-brand .logo .icon { font-size: 1.05rem; color: #fff; }
+        .upload-area .upload-icon { font-size: 1.4rem; color: var(--text-muted); margin-bottom: 0.3rem; }
+        .send-btn .icon { font-size: 1.05rem; }
+        .btn-logout { display: inline-flex; align-items: center; }
+        .logs-header span { display: inline-flex; align-items: center; gap: 0.4rem; }
+        #logsToggleBtn .icon { transition: transform var(--transition); }
+        .logs-bar.expanded #logsToggleBtn .icon { transform: rotate(180deg); }
+        .health-pill .icon { font-size: 0.8rem; }
+        .btn-modal-download, .report-actions button { display: inline-flex; align-items: center; gap: 0.35rem; }
+
+        /* Theme button in the top bar */
+        .theme-btn {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            background: none; border: 1px solid var(--border); border-radius: var(--radius-sm);
+            padding: 0.3rem 0.55rem; font-family: inherit; font-size: 0.72rem;
+            color: var(--text-secondary); cursor: pointer;
+        }
+        .theme-btn:hover, .btn-reset:hover { background: var(--bg-hover); }
+
+        /* Suggested questions under the welcome message */
+        .suggestions { display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.75rem; }
+        .suggestion-chip {
+            border: 1px solid var(--border); background: var(--bg-surface-alt); color: var(--text-primary);
+            border-radius: 999px; padding: 0.35rem 0.8rem; font-family: inherit; font-size: 0.78rem;
+            cursor: pointer; text-align: left; transition: border-color var(--transition), background var(--transition);
+        }
+        .suggestion-chip:hover { border-color: var(--accent); background: var(--accent-light); }
+        .suggestion-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Notifications: a close button; errors stay longer */
+        .toast { display: flex; align-items: flex-start; gap: 0.6rem; }
+        .toast-text { flex: 1; }
+        .toast-close {
+            background: none; border: none; color: inherit; opacity: 0.8; cursor: pointer;
+            padding: 0; font-size: 0.85rem; line-height: 1; display: inline-flex;
+        }
+        .toast-close:hover { opacity: 1; }
+        .toast.error { animation: toastIn 0.3s ease, toastOut 0.3s ease 7.7s forwards; }
+
+        /* Report History filter (shown once there are several reports) */
+        .report-filter {
+            width: 100%; margin-bottom: 0.4rem; padding: 0.35rem 0.5rem;
+            background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.08);
+            border-radius: var(--radius-sm); color: var(--text-inverse);
+            font-family: inherit; font-size: 0.72rem;
+        }
+        .report-filter::placeholder { color: rgba(255,255,255,0.35); }
+
+        /* "New messages" button when a reply arrives while reading further up */
+        .chat-container { position: relative; }
+        .jump-latest {
+            position: absolute; left: 50%; transform: translateX(-50%); bottom: 5.5rem; z-index: 5;
+            display: none; align-items: center; gap: 0.35rem;
+            background: var(--accent); color: #fff; border: none; border-radius: 999px;
+            padding: 0.4rem 0.9rem; font-family: inherit; font-size: 0.75rem; font-weight: 600;
+            box-shadow: var(--shadow-lg); cursor: pointer;
+        }
+        .jump-latest.show { display: inline-flex; }
+
+        @media (max-width: 600px) {
+            .modal-header { flex-wrap: wrap; }
+            .top-bar { padding: 0.6rem 0.9rem; }
+            .theme-btn .theme-label { display: none; }
+            .top-bar-left { gap: 0.6rem; min-width: 0; }
+            .top-bar-right { gap: 0.4rem; }
+            .top-bar h2 { font-size: 0.9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .btn-reset { white-space: nowrap; }
+            .health-pill { display: none; }
+            .chat-messages { padding: 1rem 0.9rem; }
+            .chat-input-container { padding: 0.7rem 0.9rem; }
+            .logs-header { padding: 0.45rem 0.9rem; }
+        }
+
+        /* Dark mode: follows the system setting unless the theme button has
+           set data-theme on <html> to "light" or "dark". The sidebar is dark
+           already; these turn the main area dark to match. The two blocks
+           below hold the same values: one for the system setting, one for
+           an explicit choice. */
+        :root { color-scheme: light; }
+        @media (prefers-color-scheme: dark) {
+            :root:not([data-theme="light"]) {
+                color-scheme: dark;
+                --bg-surface: #1e293b;
+                --bg-surface-alt: #0f172a;
+                --bg-hover: #334155;
+                --text-primary: #f8fafc;
+                --text-secondary: #cbd5e1;
+                --border: #334155;
+                --border-light: #273449;
+            }
+            :root:not([data-theme="light"]) .sidebar { border-right: 1px solid rgba(255,255,255,0.06); }
+            :root:not([data-theme="light"]) .agent-message .msg-bubble code:not(pre code) { color: #93c5fd; }
+            :root:not([data-theme="light"]) .agent-message .msg-bubble .no-docs-warning { color: #fcd34d; }
+        }
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --bg-surface: #1e293b;
+            --bg-surface-alt: #0f172a;
+            --bg-hover: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --border: #334155;
+            --border-light: #273449;
+        }
+        :root[data-theme="dark"] .sidebar { border-right: 1px solid rgba(255,255,255,0.06); }
+        :root[data-theme="dark"] .agent-message .msg-bubble code:not(pre code) { color: #93c5fd; }
+        :root[data-theme="dark"] .agent-message .msg-bubble .no-docs-warning { color: #fcd34d; }
+
+        /* Printing a report: only the report, on a light page. The selector
+           matches the theme rules' weight, so being later it wins. */
+        @media print {
+            :root:is([data-theme], :not([data-theme])) {
+                color-scheme: light;
+                --bg-surface: #ffffff; --bg-surface-alt: #f8fafc;
+                --text-primary: #0f172a; --text-secondary: #475569; --border: #e2e8f0;
+            }
+            body.print-report { height: auto; overflow: visible; background: #ffffff; }
+            body.print-report .app-layout,
+            body.print-report .toast-container,
+            body.print-report #confirmModal,
+            body.print-report .modal-header-actions,
+            body.print-report .std-tooltip-wrapper { display: none !important; }
+            body.print-report #reportModal { position: static; display: block !important; background: none; animation: none; }
+            body.print-report .report-modal-box {
+                max-width: none; width: auto; max-height: none; overflow: visible;
+                box-shadow: none; border-radius: 0; animation: none;
+            }
+            body.print-report .modal-report-content { overflow: visible; }
+        }
+
         /* Respect users who prefer reduced motion */
         @media (prefers-reduced-motion: reduce) {
             *, *::before, *::after {
@@ -1090,6 +1321,31 @@
     </style>
 </head>
 <body>
+    <!-- Line icons (Feather, MIT licence), used as <svg><use href="#i-name"/></svg> -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+        <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></symbol>
+        <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></symbol>
+        <symbol id="i-chart" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></symbol>
+        <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></symbol>
+        <symbol id="i-activity" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+        <symbol id="i-book" viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></symbol>
+        <symbol id="i-chevron-right" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></symbol>
+        <symbol id="i-chevron-up" viewBox="0 0 24 24"><polyline points="18 15 12 9 6 15"/></symbol>
+        <symbol id="i-upload" viewBox="0 0 24 24"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></symbol>
+        <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></symbol>
+        <symbol id="i-trash" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+        <symbol id="i-x" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></symbol>
+        <symbol id="i-power" viewBox="0 0 24 24"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></symbol>
+        <symbol id="i-menu" viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></symbol>
+        <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+        <symbol id="i-terminal" viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></symbol>
+        <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></symbol>
+        <symbol id="i-moon" viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></symbol>
+        <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></symbol>
+        <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+        <symbol id="i-printer" viewBox="0 0 24 24"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></symbol>
+        <symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>
+    </svg>
     <div class="app-layout">
         <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
 
@@ -1097,7 +1353,7 @@
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="sidebar-brand">
-                    <div class="logo">🛡️</div>
+                    <div class="logo"><svg class="icon" aria-hidden="true"><use href="#i-shield"/></svg></div>
                     <div>
                         <h1>ComplianceAI</h1>
                         <span>Enterprise Framework</span>
@@ -1118,16 +1374,19 @@
             <div class="sidebar-content">
                 <!-- Documents Panel -->
                 <div class="panel-section">
-                    <button class="panel-toggle" aria-expanded="true" onclick="togglePanel(this)">
-                        📄 Company Documents
-                        <span class="toggle-icon">▸</span>
+                    <button class="panel-toggle" aria-expanded="true" aria-controls="docPanel" onclick="togglePanel(this)">
+                        <span class="panel-title"><svg class="icon" aria-hidden="true"><use href="#i-file"/></svg> Company Documents</span>
+                        <span class="toggle-icon"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></span>
                     </button>
                     <div class="panel-body open" id="docPanel">
-                        <div class="upload-area" id="uploadArea" onclick="document.getElementById('fileInput').click()">
+                        <div class="upload-area" id="uploadArea" role="button" tabindex="0"
+                            aria-label="Upload company documents: PDF, DOCX or TXT, up to 50 MB each"
+                            onclick="document.getElementById('fileInput').click()" onkeydown="handleUploadAreaKey(event)">
+                            <div class="upload-icon"><svg class="icon" aria-hidden="true"><use href="#i-upload"/></svg></div>
                             <p>Drop files here or click to upload</p>
-                            <p class="format-hint">PDF, DOCX, TXT (max 50 MB)</p>
+                            <p class="format-hint">PDF, DOCX, TXT (max 50 MB each)</p>
                         </div>
-                        <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.txt" onchange="uploadFile(this)">
+                        <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.txt" multiple onchange="uploadFile(this)">
                         <div class="upload-progress" id="uploadProgress"></div>
                         <div class="doc-list" id="docList"></div>
                     </div>
@@ -1135,9 +1394,9 @@
 
                 <!-- Evaluation Panel -->
                 <div class="panel-section">
-                    <button class="panel-toggle" aria-expanded="true" onclick="togglePanel(this)">
-                        📊 Compliance Evaluation
-                        <span class="toggle-icon">▸</span>
+                    <button class="panel-toggle" aria-expanded="true" aria-controls="evalPanel" onclick="togglePanel(this)">
+                        <span class="panel-title"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg> Compliance Evaluation</span>
+                        <span class="toggle-icon"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></span>
                     </button>
                     <div class="panel-body open" id="evalPanel">
                         <div class="eval-form">
@@ -1148,30 +1407,53 @@
                             <button class="btn-success" onclick="runEvaluation()" id="evalButton">
                                 Run Compliance Evaluation
                             </button>
+                            <div class="eval-hint" id="evalHint" style="display:none">
+                                Upload a company document to run an evaluation.
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Report History Panel -->
                 <div class="panel-section">
-                    <button class="panel-toggle" aria-expanded="false" onclick="togglePanel(this)">
-                        📑 Report History
-                        <span class="toggle-icon">▸</span>
+                    <button class="panel-toggle" aria-expanded="false" aria-controls="reportPanel" onclick="togglePanel(this)">
+                        <span class="panel-title"><svg class="icon" aria-hidden="true"><use href="#i-clock"/></svg> Report History</span>
+                        <span class="toggle-icon"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></span>
                     </button>
                     <div class="panel-body" id="reportPanel">
-                        <div id="reportList" style="font-size:0.75rem; color: var(--text-muted);">No reports yet</div>
+                        <input type="search" id="reportFilter" class="report-filter" style="display:none"
+                            placeholder="Filter by standard or date" aria-label="Filter reports by standard or date"
+                            oninput="applyReportFilter()">
+                        <div id="reportList" class="empty-state">No reports yet</div>
+                        <div id="reportFilterEmpty" class="empty-state" style="display:none">No reports match</div>
                     </div>
                 </div>
 
                 <!-- Audit Trail Panel -->
                 <div class="panel-section">
-                    <button class="panel-toggle" aria-expanded="false" onclick="togglePanel(this)">
-                        🔍 Audit Trail
-                        <span class="toggle-icon">▸</span>
+                    <button class="panel-toggle" aria-expanded="false" aria-controls="auditPanel" onclick="togglePanel(this)">
+                        <span class="panel-title"><svg class="icon" aria-hidden="true"><use href="#i-activity"/></svg> Audit Trail</span>
+                        <span class="toggle-icon"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></span>
                     </button>
                     <div class="panel-body" id="auditPanel">
+                        <div class="audit-filters">
+                            <select id="auditActionFilter" aria-label="Filter audit events by action" onchange="loadAuditLogs()">
+                                <option value="">All actions</option>
+                                <option value="LOGIN">Login</option>
+                                <option value="LOGOUT">Logout</option>
+                                <option value="CHAT_QUERY">Chat query</option>
+                                <option value="DOCUMENT_UPLOAD">Document upload</option>
+                                <option value="DOCUMENT_DELETE">Document delete</option>
+                                <option value="EVALUATION_RUN">Evaluation run</option>
+                                <option value="REPORT_DOWNLOAD">Report download</option>
+                                <option value="REPORT_DELETE">Report delete</option>
+                                <option value="KNOWLEDGE_DOWNLOAD">Knowledge download</option>
+                                <option value="SESSION_RESET">Session reset</option>
+                            </select>
+                            <label><input type="checkbox" id="auditFailuresOnly" onchange="loadAuditLogs()"> Failures only</label>
+                        </div>
                         <div class="audit-log-list" id="auditLogList">
-                            <div style="font-size:0.75rem; color: var(--text-muted);">Loading...</div>
+                            <div class="empty-state">Loading...</div>
                         </div>
                         <button class="btn-primary" style="margin-top:0.5rem; width:100%; font-size:0.72rem;" onclick="exportAudit()">
                             Export Audit Log (CSV)
@@ -1181,13 +1463,13 @@
 
                 <!-- Knowledge Base Panel -->
                 <div class="panel-section">
-                    <button class="panel-toggle" aria-expanded="false" onclick="togglePanel(this)">
-                        📚 Knowledge Base
-                        <span class="toggle-icon">▸</span>
+                    <button class="panel-toggle" aria-expanded="false" aria-controls="kbPanel" onclick="togglePanel(this)">
+                        <span class="panel-title"><svg class="icon" aria-hidden="true"><use href="#i-book"/></svg> Knowledge Base</span>
+                        <span class="toggle-icon"><svg class="icon" aria-hidden="true"><use href="#i-chevron-right"/></svg></span>
                     </button>
                     <div class="panel-body" id="kbPanel">
                         <div class="standards-list" id="kbStandardsList">
-                            <div style="font-size:0.75rem; color: var(--text-muted);">Loading...</div>
+                            <div class="empty-state">Loading...</div>
                         </div>
                     </div>
                 </div>
@@ -1202,8 +1484,7 @@
                         <div class="user-display-name" id="userDisplayName">{{ user_name }}</div>
                         <div class="user-display-role" id="userDisplayRole">{{ user_role }}</div>
                     </div>
-                    <button id="logoutBtn" onclick="logout()" title="Sign out"
-                        style="background:none;border:1px solid rgba(255,255,255,0.15);border-radius:6px;padding:0.3rem 0.55rem;font-size:0.95rem;cursor:pointer;color:rgba(255,255,255,0.7);margin-left:auto;">⏻</button>
+                    <button id="logoutBtn" class="btn-logout" onclick="logout()" title="Sign out" aria-label="Sign out"><svg class="icon" aria-hidden="true"><use href="#i-power"/></svg></button>
                 </div>
             </div>
         </aside>
@@ -1212,7 +1493,7 @@
         <div class="main-content">
             <div class="top-bar">
                 <div class="top-bar-left">
-                    <button class="menu-btn" onclick="toggleSidebar()">☰</button>
+                    <button class="menu-btn" onclick="toggleSidebar()" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg></button>
                     <h2>Compliance Assistant</h2>
                 </div>
                 <div class="top-bar-right">
@@ -1221,26 +1502,30 @@
                         <span id="healthModel">GPT-4o</span>
                     </div>
                     <div class="health-pill">
-                        📄 <span id="healthDocs">0</span> docs
+                        <svg class="icon" aria-hidden="true"><use href="#i-file"/></svg> <span id="healthDocs">0</span> docs
                     </div>
-                    <button onclick="resetSession()" style="background:none; border:1px solid var(--border); border-radius:var(--radius-sm); padding:0.3rem 0.6rem; font-size:0.72rem; cursor:pointer; color:var(--text-secondary);">
+                    <button class="theme-btn" id="themeBtn" onclick="cycleTheme()"><svg class="icon" aria-hidden="true"><use href="#i-monitor"/></svg><span class="theme-label">System</span></button>
+                    <button class="btn-reset" onclick="resetSession()">
                         Reset Session
                     </button>
                 </div>
             </div>
 
             <div class="chat-container">
-                <div class="chat-messages" id="chatMessages">
+                <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-label="Conversation">
                 </div>
+
+                <button class="jump-latest" id="jumpLatest" onclick="scrollChatToBottom()"><svg class="icon" aria-hidden="true"><use href="#i-arrow-down"/></svg> New messages</button>
 
                 <div class="typing-indicator" id="typingIndicator">
                     <div class="typing-dots"><span></span><span></span><span></span></div>
+                    <span class="typing-label" id="typingLabel"></span>
                 </div>
 
                 <div class="chat-input-container">
                     <div class="chat-input-wrapper">
-                        <textarea id="messageInput" rows="1" placeholder="Ask about compliance standards, regulations, or your documents..." onkeydown="handleKeyPress(event)" oninput="autoGrowInput(this)"></textarea>
-                        <button class="send-btn" onclick="sendMessage()" id="sendButton" title="Send message">➤</button>
+                        <textarea id="messageInput" rows="1" aria-label="Message" placeholder="Ask about compliance standards, regulations, or your documents..." onkeydown="handleKeyPress(event)" oninput="autoGrowInput(this)"></textarea>
+                        <button class="send-btn" onclick="sendMessage()" id="sendButton" title="Send message" aria-label="Send message"><svg class="icon" aria-hidden="true"><use href="#i-send"/></svg></button>
                     </div>
                 </div>
             </div>
@@ -1248,8 +1533,8 @@
             <!-- Logs Bar -->
             <div class="logs-bar collapsed" id="logsBar">
                 <div class="logs-header" onclick="toggleLogs()">
-                    <span>📋 Execution Logs</span>
-                    <button id="logsToggleBtn">▲</button>
+                    <span><svg class="icon" aria-hidden="true"><use href="#i-terminal"/></svg> Execution Logs</span>
+                    <button id="logsToggleBtn" aria-label="Show execution logs" aria-expanded="false"><svg class="icon" aria-hidden="true"><use href="#i-chevron-up"/></svg></button>
                 </div>
                 <div class="logs-content" id="logsContent">
                     <div class="log-entry">Ready.</div>
@@ -1260,7 +1545,7 @@
 
     <!-- Confirmation Modal (#007) -->
     <div class="modal-overlay" id="confirmModal" style="display:none" onclick="handleConfirmOverlayClick(event)">
-        <div class="modal-box">
+        <div class="modal-box" role="alertdialog" aria-modal="true" aria-labelledby="confirmModalTitle" aria-describedby="confirmModalMessage">
             <div class="modal-title" id="confirmModalTitle">Confirm</div>
             <div class="modal-message" id="confirmModalMessage"></div>
             <div class="modal-actions">
@@ -1272,14 +1557,16 @@
 
     <!-- Report View Modal (#005) -->
     <div class="modal-overlay" id="reportModal" style="display:none" onclick="handleReportOverlayClick(event)">
-        <div class="modal-box report-modal-box">
+        <div class="modal-box report-modal-box" role="dialog" aria-modal="true" aria-labelledby="reportModalTitle">
             <div class="modal-header">
-                <div class="modal-title">Compliance Evaluation Report</div>
+                <div class="modal-title" id="reportModalTitle">Compliance Evaluation Report</div>
                 <div class="modal-header-actions">
+                    <button class="btn-modal-download" onclick="copyCurrentModalReport()"><svg class="icon" aria-hidden="true"><use href="#i-copy"/></svg> Copy</button>
+                    <button class="btn-modal-download" onclick="printCurrentModalReport()"><svg class="icon" aria-hidden="true"><use href="#i-printer"/></svg> Print / PDF</button>
                     <button class="btn-modal-download" id="reportModalDownloadBtn" onclick="downloadCurrentModalReport()">
-                        📥 Download (.md)
+                        <svg class="icon" aria-hidden="true"><use href="#i-download"/></svg> Download (.md)
                     </button>
-                    <button class="btn-modal-close" onclick="closeReportModal()" title="Close">✕</button>
+                    <button class="btn-modal-close" onclick="closeReportModal()" title="Close" aria-label="Close report"><svg class="icon" aria-hidden="true"><use href="#i-x"/></svg></button>
                 </div>
             </div>
             <div class="modal-report-meta" id="reportModalMeta"></div>
@@ -1288,19 +1575,40 @@
     </div>
 
     <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+    <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
     <script>
         // ------------------------------------------------------------------
         // State
         // ------------------------------------------------------------------
-        let USER_ID = {{ user_id|tojson }};
         let _chatInFlight = false;  // guards against duplicate concurrent sends
+        let _evalInFlight = false;  // keeps the evaluate button off while a run is going
+        const KB_STANDARDS_COUNT = {{ standards_count|tojson }};
 
-        // Default-checked standards for fintech / Pakistan context
-        const DEFAULT_CHECKED_STANDARDS = [
-            'ISO 27001', 'SOC 2', 'GDPR', 'NIST CSF', 'PCI DSS',
-            'SBP Regulations', 'FATF', 'SECP Guidelines', 'Pakistan AML/CFT',
+        // An expired session made every request fail with 401, which showed as
+        // "Error: Authentication required" in the chat. Send the user to the
+        // login page instead; the pending promise never settles, so callers
+        // don't report an error while the page is leaving.
+        const _nativeFetch = window.fetch.bind(window);
+        window.fetch = async (...args) => {
+            const res = await _nativeFetch(...args);
+            if (res.status === 401) {
+                // Signed out: nothing to keep, so skip the running-evaluation
+                // prompt rather than offer to stay on a dead page.
+                window.removeEventListener('beforeunload', warnEvalInProgress);
+                window.location.href = '/login';
+                return new Promise(() => {});
+            }
+            return res;
+        };
+
+        // Default-checked standards for fintech / Pakistan context. Matched by
+        // file name: the grid shows each file's full heading, which never
+        // equalled a short name like 'ISO 27001', so nothing was ticked.
+        const DEFAULT_CHECKED_FILES = [
+            'iso_27001.md', 'soc2.md', 'gdpr.md', 'nist_csf.md', 'pci_dss.md',
+            'sbp_regulations.md', 'fatf_guidelines.md', 'secp_guidelines.md',
+            'pakistan_aml_cft.md',
         ];
 
         // ------------------------------------------------------------------
@@ -1308,7 +1616,10 @@
         // ------------------------------------------------------------------
         document.addEventListener('DOMContentLoaded', () => {
             initUserWidget();
-            showWelcomeMessage(CURRENT_USER.name);
+            updateThemeButton();
+            setupChatScroll();
+            updateInputPlaceholder();
+            loadChatHistory(showWelcomeMessage(CURRENT_USER.name));
             loadKBStatus();
             loadDocuments();
             loadKBStandards();
@@ -1340,18 +1651,57 @@
             body.classList.toggle('open');
         }
 
+        // The arrow icon turns with the panel (CSS on .logs-bar.expanded).
         function toggleLogs() {
             const bar = document.getElementById('logsBar');
             const btn = document.getElementById('logsToggleBtn');
-            if (bar.classList.contains('collapsed')) {
-                bar.classList.remove('collapsed');
-                bar.classList.add('expanded');
-                btn.textContent = '▼';
-            } else {
-                bar.classList.remove('expanded');
-                bar.classList.add('collapsed');
-                btn.textContent = '▲';
-            }
+            const opening = bar.classList.contains('collapsed');
+            bar.classList.toggle('collapsed', !opening);
+            bar.classList.toggle('expanded', opening);
+            btn.setAttribute('aria-expanded', String(opening));
+            btn.setAttribute('aria-label', opening ? 'Hide execution logs' : 'Show execution logs');
+        }
+
+        // Markup for one of the line icons defined at the top of <body>.
+        function iconSvg(name) {
+            return `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+        }
+
+        // ------------------------------------------------------------------
+        // Theme: System -> Light -> Dark. Saved in this browser only.
+        // ------------------------------------------------------------------
+        const THEMES = [
+            { key: 'system', label: 'System', icon: 'monitor' },
+            { key: 'light', label: 'Light', icon: 'sun' },
+            { key: 'dark', label: 'Dark', icon: 'moon' },
+        ];
+
+        function currentTheme() {
+            return document.documentElement.dataset.theme || 'system';
+        }
+
+        function applyTheme(key) {
+            if (key === 'system') delete document.documentElement.dataset.theme;
+            else document.documentElement.dataset.theme = key;
+            try {
+                if (key === 'system') localStorage.removeItem('complianceai-theme');
+                else localStorage.setItem('complianceai-theme', key);
+            } catch (e) { /* not saved; still applies to this page */ }
+            updateThemeButton();
+        }
+
+        function cycleTheme() {
+            const i = THEMES.findIndex(t => t.key === currentTheme());
+            applyTheme(THEMES[(i + 1) % THEMES.length].key);
+        }
+
+        function updateThemeButton() {
+            const theme = THEMES.find(t => t.key === currentTheme()) || THEMES[0];
+            const next = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+            const btn = document.getElementById('themeBtn');
+            btn.innerHTML = `${iconSvg(theme.icon)}<span class="theme-label">${theme.label}</span>`;
+            btn.title = `Theme: ${theme.label}. Click for ${next.label}.`;
+            btn.setAttribute('aria-label', `Theme: ${theme.label}. Switch to ${next.label}`);
         }
 
         // ------------------------------------------------------------------
@@ -1364,10 +1714,10 @@
             try {
                 const res = await fetch('/knowledge/standards');
                 const data = await res.json();
-                const standards = (data.standards || []).map(s => s.title);
                 grid.innerHTML = '';
-                standards.forEach(std => {
-                    const checked = DEFAULT_CHECKED_STANDARDS.includes(std);
+                (data.standards || []).forEach(s => {
+                    const std = s.title;
+                    const checked = DEFAULT_CHECKED_FILES.includes(s.filename);
                     const label = document.createElement('label');
                     label.className = 'std-check';
                     label.title = std;
@@ -1380,7 +1730,7 @@
                 });
                 enforceStandardsCap();
             } catch (e) {
-                grid.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">Failed to load standards</div>';
+                grid.innerHTML = '<div class="empty-state">Failed to load standards</div>';
             }
         }
 
@@ -1427,9 +1777,43 @@
         // Welcome message
         // ------------------------------------------------------------------
         function showWelcomeMessage(name) {
-            addMessage('agent',
-                `Hello, **${name}**! Welcome to **ComplianceAI**.\n\nI'm an AI-powered compliance and governance assistant designed to help fintech organisations operating in Pakistan stay on top of regulatory requirements. I'm backed by a knowledge base covering **18 standards and frameworks** including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, SBP Regulations, SECP Guidelines, FATF, Basel III/IV, and more.\n\nHere's how I can help you:\n- Answer questions on compliance standards, regulations, and best practices\n- Analyse your uploaded company documents against regulatory requirements\n- Run structured compliance evaluations and generate gap analysis reports\n- Maintain a full audit trail of all actions for accountability\n\nHow can I assist you today?`
+            const coverage = KB_STANDARDS_COUNT > 0
+                ? `**${KB_STANDARDS_COUNT} standards and frameworks**`
+                : '**standards and frameworks**';
+            const msg = addMessage('agent',
+                `Hello, **${name}**! Welcome to **ComplianceAI**.\n\nI'm an AI-powered compliance and governance assistant designed to help fintech organisations operating in Pakistan stay on top of regulatory requirements. I'm backed by a knowledge base covering ${coverage} including ISO 27001, SOC 2, GDPR, NIST CSF, PCI DSS, SBP Regulations, SECP Guidelines, FATF, Basel III/IV, and more.\n\nHere's how I can help you:\n- Answer questions on compliance standards, regulations, and best practices\n- Analyse your uploaded company documents against regulatory requirements\n- Run structured compliance evaluations and generate gap analysis reports\n- Maintain a full audit trail of all actions for accountability\n\nHow can I assist you today? Pick a question to start, or type your own.`
             );
+            addSuggestions(msg, SUGGESTED_QUESTIONS);
+            return msg;
+        }
+
+        // Starter questions under the welcome message; one click sends it.
+        const SUGGESTED_QUESTIONS = [
+            'What are the key requirements of GDPR Article 32?',
+            'What controls does ISO 27001 require for access management?',
+            'How does our security policy align with NIST CSF?',
+            'What are the AML/CFT record-keeping obligations in Pakistan?',
+        ];
+
+        function addSuggestions(messageEl, questions) {
+            const box = document.createElement('div');
+            box.className = 'suggestions';
+            box.setAttribute('role', 'group');
+            box.setAttribute('aria-label', 'Suggested questions');
+            questions.forEach(q => {
+                const chip = document.createElement('button');
+                chip.type = 'button';
+                chip.className = 'suggestion-chip';
+                chip.textContent = q;
+                chip.addEventListener('click', () => {
+                    if (_chatInFlight) return;
+                    const input = document.getElementById('messageInput');
+                    input.value = q;
+                    sendMessage();
+                });
+                box.appendChild(chip);
+            });
+            messageEl.querySelector('.msg-bubble').appendChild(box);
         }
 
         // ------------------------------------------------------------------
@@ -1477,7 +1861,7 @@
                 const data = await res.json();
                 const list = document.getElementById('kbStandardsList');
                 if (!data.standards || data.standards.length === 0) {
-                    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">No standards loaded</div>';
+                    list.innerHTML = '<div class="empty-state">No standards loaded</div>';
                     return;
                 }
                 list.innerHTML = '';
@@ -1489,7 +1873,7 @@
                             <div class="std-title">${s.title}</div>
                             <div class="std-file">${s.filename} · ${(s.size_bytes / 1024).toFixed(1)} KB</div>
                         </div>
-                        <button class="std-download-btn" title="Download ${s.title}" onclick="downloadKnowledgeDoc('${s.filename}')">📥</button>`;
+                        <button class="std-download-btn" title="Download ${s.title}" aria-label="Download ${s.title}" onclick="downloadKnowledgeDoc('${s.filename}')">${iconSvg('download')}</button>`;
                     list.appendChild(div);
                 });
             } catch (e) {
@@ -1499,7 +1883,7 @@
 
         function downloadKnowledgeDoc(filename) {
             const a = document.createElement('a');
-            a.href = `/knowledge/standards/${encodeURIComponent(filename)}/download?user_id=${USER_ID}`;
+            a.href = `/knowledge/standards/${encodeURIComponent(filename)}/download`;
             a.download = filename;
             a.style.display = 'none';
             document.body.appendChild(a);
@@ -1515,12 +1899,21 @@
             const area = document.getElementById('uploadArea');
             ['dragenter','dragover'].forEach(e => area.addEventListener(e, ev => { ev.preventDefault(); area.classList.add('drag-over'); }));
             ['dragleave','drop'].forEach(e => area.addEventListener(e, ev => { ev.preventDefault(); area.classList.remove('drag-over'); }));
-            area.addEventListener('drop', e => { if (e.dataTransfer.files.length > 0) uploadFileObj(e.dataTransfer.files[0]); });
+            area.addEventListener('drop', e => { if (e.dataTransfer.files.length > 0) uploadFiles(e.dataTransfer.files); });
+        }
+
+        // The upload area is a div, so it needs Enter and Space itself.
+        function handleUploadAreaKey(event) {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                document.getElementById('fileInput').click();
+            }
         }
 
         async function loadDocuments() {
             try {
-                const res = await fetch(`/documents?user_id=${USER_ID}`);
+                const res = await fetch('/documents');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
                 const list = document.getElementById('docList');
                 const healthDocs = document.getElementById('healthDocs');
@@ -1535,45 +1928,101 @@
                             title="Include this document in the next evaluation">
                         <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
                         <span class="doc-meta">${doc.chunk_count} chunks</span>
-                        <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete">✕</button>`;
+                        <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete" aria-label="Delete ${doc.original_filename}">${iconSvg('x')}</button>`;
                     list.appendChild(div);
                 });
+                // Only after a successful load: a failed request says nothing
+                // about how many documents there are.
+                updateEvalButtonState();
             } catch (e) { console.error('Error loading documents:', e); }
         }
 
-        function uploadFile(input) { if (input.files.length > 0) uploadFileObj(input.files[0]); }
+        // With no documents the server can only answer "upload first", so
+        // say that up front instead of after a click.
+        function updateEvalButtonState() {
+            if (_evalInFlight) return;
+            const hasDocs = getTotalDocCount() > 0;
+            document.getElementById('evalButton').disabled = !hasDocs;
+            document.getElementById('evalHint').style.display = hasDocs ? 'none' : 'block';
+        }
 
-        async function uploadFileObj(file) {
+        function uploadFile(input) { if (input.files.length > 0) uploadFiles(input.files); }
+
+        let _uploadInFlight = false;
+        let _uploadProgressTimer = null;
+
+        // The server takes one file per request, so several files go up one
+        // after another, each with its own result.
+        async function uploadFiles(fileList) {
+            // Copied first: clearing the picker empties its live file list.
+            // Cleared every time, so picking the same file again still fires
+            // a change event.
+            const files = Array.from(fileList);
+            document.getElementById('fileInput').value = '';
+            if (_uploadInFlight) {
+                showToast('Please wait for the current upload to finish', 'info');
+                return;
+            }
+            if (files.length === 0) return;
+
+            _uploadInFlight = true;
+            clearTimeout(_uploadProgressTimer);
             const progress = document.getElementById('uploadProgress');
-            progress.className = 'upload-progress show loading';
-            progress.textContent = `Uploading ${file.name}...`;
+            const failures = [];
+            let succeeded = 0;
 
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const position = files.length > 1 ? ` (${i + 1} of ${files.length})` : '';
+                progress.className = 'upload-progress show loading';
+                progress.textContent = `Uploading ${file.name}${position}...`;
+                const result = await uploadOne(file);
+                if (result.ok) {
+                    succeeded++;
+                    if (files.length === 1) {
+                        progress.className = 'upload-progress show success';
+                        progress.textContent = `✓ ${file.name}: ${result.chunks} chunks indexed`;
+                        showToast(`Document "${file.name}" uploaded - ${result.chunks} chunks indexed`, 'success');
+                    }
+                } else {
+                    failures.push(`${file.name}: ${result.error}`);
+                    if (files.length === 1) {
+                        progress.className = 'upload-progress show error';
+                        progress.textContent = `✗ ${result.error}`;
+                        showToast(`Upload failed: ${result.error}`, 'error');
+                    }
+                }
+            }
+
+            if (files.length > 1) {
+                const allOk = failures.length === 0;
+                progress.className = `upload-progress show ${allOk ? 'success' : 'error'}`;
+                progress.textContent = allOk
+                    ? `✓ ${succeeded} of ${files.length} documents uploaded`
+                    : `${succeeded} of ${files.length} uploaded. Failed: ${failures.join('; ')}`;
+                showToast(
+                    allOk ? `${succeeded} documents uploaded` : `${failures.length} of ${files.length} uploads failed`,
+                    allOk ? 'success' : 'error'
+                );
+            }
+
+            if (succeeded > 0) loadDocuments();
+            loadAuditLogs();
+            _uploadInFlight = false;
+            _uploadProgressTimer = setTimeout(() => { progress.className = 'upload-progress'; }, failures.length ? 12000 : 6000);
+        }
+
+        async function uploadOne(file) {
             const formData = new FormData();
             formData.append('file', file);
-            formData.append('user_id', USER_ID);
-
             try {
                 const res = await fetch('/upload', { method: 'POST', body: formData });
                 const data = await res.json();
-                if (data.success) {
-                    progress.className = 'upload-progress show success';
-                    progress.textContent = `✓ ${file.name}: ${data.chunks} chunks indexed`;
-                    showToast(`Document "${file.name}" uploaded - ${data.chunks} chunks indexed`, 'success');
-                    loadDocuments();
-                    loadAuditLogs();
-                } else {
-                    progress.className = 'upload-progress show error';
-                    progress.textContent = `✗ ${data.error}`;
-                    showToast(`Upload failed: ${data.error}`, 'error');
-                }
+                if (data.success) return { ok: true, chunks: data.chunks };
+                return { ok: false, error: data.error || 'Upload failed' };
             } catch (e) {
-                progress.className = 'upload-progress show error';
-                progress.textContent = `✗ Upload failed: ${e.message}`;
-                showToast(`Upload failed: ${e.message}`, 'error');
+                return { ok: false, error: e.message };
             }
-
-            setTimeout(() => { progress.className = 'upload-progress'; }, 6000);
-            document.getElementById('fileInput').value = '';
         }
 
         async function deleteDocument(docId) {
@@ -1583,11 +2032,21 @@
                 'Delete',
                 async () => {
                     try {
-                        await fetch(`/documents/${docId}?user_id=${USER_ID}`, { method: 'DELETE' });
+                        const res = await fetch(`/documents/${docId}`, { method: 'DELETE' });
+                        const data = await res.json().catch(() => ({}));
                         loadDocuments();
                         loadAuditLogs();
-                        showToast('Document deleted', 'info');
-                    } catch (e) { console.error('Error deleting document:', e); }
+                        // A failed delete leaves the document in place; say so
+                        // rather than reporting success.
+                        if (res.ok) {
+                            showToast('Document deleted', 'info');
+                        } else {
+                            showToast(data.error || 'Failed to delete document', 'error');
+                        }
+                    } catch (e) {
+                        console.error('Error deleting document:', e);
+                        showToast('Failed to delete document', 'error');
+                    }
                 }
             );
         }
@@ -1604,15 +2063,35 @@
                 return;
             }
 
-            const btn = document.getElementById('evalButton');
-            btn.disabled = true;
-            btn.textContent = 'Evaluating...';
-
+            // An empty list made the server fall back to its own defaults, so
+            // the report covered standards the user had not selected.
             const standards = getSelectedStandards();
+            if (standards.length === 0) {
+                showToast('Select at least one standard to evaluate', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('evalButton');
+            _evalInFlight = true;
+            btn.disabled = true;
+
+            // A run takes minutes with no other sign of life, so show the
+            // elapsed time and warn before the page is closed or reloaded.
+            const startedAt = Date.now();
+            const typingLabel = document.getElementById('typingLabel');
+            const tick = () => {
+                const secs = Math.floor((Date.now() - startedAt) / 1000);
+                const elapsed = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+                btn.textContent = `Evaluating... ${elapsed}`;
+                typingLabel.textContent = `Running evaluation (${elapsed}). This can take a few minutes.`;
+            };
+            tick();
+            const timer = setInterval(tick, 1000);
+            window.addEventListener('beforeunload', warnEvalInProgress);
 
             const docLabel = totalDocs > 0 ? `, ${docIds.length}/${totalDocs} document(s)` : '';
             addMessage('user', `Run compliance evaluation against ${standards.length} standard(s)${docLabel} - Fintech / Pakistan`);
-            showTyping(true);
+            const stopTyping = startTyping();
 
             const logsContent = document.getElementById('logsContent');
             logsContent.innerHTML = '<div class="log-entry">Running evaluation...</div>';
@@ -1621,10 +2100,10 @@
                 const res = await fetch('/evaluate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: USER_ID, standards, doc_ids: docIds })
+                    body: JSON.stringify({ standards, doc_ids: docIds })
                 });
                 const data = await res.json();
-                showTyping(false);
+                stopTyping();
 
                 if (data.warning) {
                     const container = document.getElementById('chatMessages');
@@ -1649,20 +2128,53 @@
                     addMessage('agent', `**Error:** ${data.error}`);
                     showToast(data.error, 'error');
                 } else {
-                    addMessage('agent', data.report);
+                    const msg = addMessage('agent', data.report);
+                    msg.querySelector('.msg-bubble').insertAdjacentHTML('afterbegin', buildReportSummary(data.report));
+                    if (data.report_id) {
+                        addReportActions(msg, data.report_id, {
+                            timestamp: data.timestamp,
+                            standards: data.standards_evaluated,
+                        });
+                    }
                     showToast(`Evaluation complete - Report ID: ${data.report_id}`, 'success');
                     loadReports();
                     if (data.logs) displayLogs(data.logs);
                 }
                 loadAuditLogs();
             } catch (e) {
-                showTyping(false);
+                stopTyping();
                 addMessage('agent', `**Evaluation failed:** ${e.message}`);
                 showToast(`Evaluation failed: ${e.message}`, 'error');
             }
 
-            btn.disabled = false;
+            clearInterval(timer);
+            typingLabel.textContent = '';
+            window.removeEventListener('beforeunload', warnEvalInProgress);
+            _evalInFlight = false;
             btn.textContent = 'Run Compliance Evaluation';
+            btn.disabled = false;
+            updateEvalButtonState();
+        }
+
+        function warnEvalInProgress(event) {
+            event.preventDefault();
+            event.returnValue = '';  // older browsers need this to show the prompt
+        }
+
+        // The saved report is otherwise only reachable through Report History.
+        function addReportActions(messageEl, reportId, meta) {
+            const actions = document.createElement('div');
+            actions.className = 'report-actions';
+            const openBtn = document.createElement('button');
+            openBtn.className = 'btn-modal-download';
+            openBtn.textContent = 'Open report';
+            openBtn.addEventListener('click', () => viewReport(reportId, meta));
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'btn-modal-download';
+            downloadBtn.innerHTML = `${iconSvg('download')} Download (.md)`;
+            downloadBtn.addEventListener('click', () => downloadReport(reportId));
+            actions.append(openBtn, downloadBtn);
+            messageEl.querySelector('.msg-bubble').appendChild(actions);
         }
 
         // ------------------------------------------------------------------
@@ -1670,13 +2182,19 @@
         // ------------------------------------------------------------------
         async function loadReports() {
             try {
-                const res = await fetch(`/reports?user_id=${USER_ID}`);
+                const res = await fetch('/reports');
                 const data = await res.json();
                 const list = document.getElementById('reportList');
                 const reports = data.reports || [];
 
+                // The filter is only worth its space once the list is long.
+                const filter = document.getElementById('reportFilter');
+                filter.style.display = reports.length > 3 ? 'block' : 'none';
+                if (reports.length <= 3) filter.value = '';
+
                 if (reports.length === 0) {
-                    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">No reports yet</div>';
+                    list.innerHTML = '<div class="empty-state">No reports yet</div>';
+                    applyReportFilter();
                     return;
                 }
 
@@ -1684,54 +2202,100 @@
                 reports.forEach(r => {
                     const d = new Date(r.timestamp);
                     const dateStr = `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}`;
-                    const stdListHtml = (r.standards || []).map(s => `• ${escapeHtml(s)}`).join('<br>');
+                    const stdNames = r.standards || [];
+                    const stdListHtml = stdNames.map(s => `• ${escapeHtml(s)}`).join('<br>');
                     const div = document.createElement('div');
                     div.className = 'doc-item';
                     div.style.cursor = 'pointer';
-                    // #008: show standards in a hover tooltip
+                    // The date is a real button, so Tab, Enter and Space open the
+                    // report; its click reaches the row's handler below. A role on
+                    // the row itself would hide the buttons inside it from screen
+                    // readers. #008: standards in a tooltip, on hover or focus.
                     div.innerHTML = `
-                        <span class="doc-name">${dateStr}</span>
-                        <span class="doc-meta std-badge" data-stds="${escapeHtml(stdListHtml)}" style="cursor:default">
-                            ${r.standards.length} stds
+                        <button type="button" class="doc-name report-open-btn"
+                            aria-label="Open report from ${escapeAttr(dateStr)}">${escapeHtml(dateStr)}</button>
+                        <span class="doc-meta std-badge" tabindex="0" data-stds="${escapeAttr(stdListHtml)}" style="cursor:default">
+                            ${stdNames.length} ${stdNames.length === 1 ? 'std' : 'stds'}<span class="sr-only">: ${escapeHtml(stdNames.join(', '))}</span>
                         </span>
                         <button class="delete-btn" onclick="event.stopPropagation(); downloadReport('${r.report_id}')"
-                            title="Download report as Markdown" style="color:var(--accent); font-size:1rem;">📥</button>
+                            title="Download report as Markdown" aria-label="Download report from ${escapeAttr(dateStr)}" style="color:var(--accent); font-size:0.85rem;">${iconSvg('download')}</button>
                         <button class="delete-btn" onclick="event.stopPropagation(); deleteReport('${r.report_id}')"
-                            title="Delete report" style="font-size:1rem;">🗑️</button>`;
+                            title="Delete report" aria-label="Delete report from ${escapeAttr(dateStr)}" style="font-size:0.85rem;">${iconSvg('trash')}</button>`;
                     div.addEventListener('click', () => viewReport(r.report_id, r));
+                    div.dataset.search = `${dateStr} ${stdNames.join(' ')}`.toLowerCase();
                     list.appendChild(div);
                 });
+                applyReportFilter();
             } catch (e) { console.error('Error loading reports:', e); }
         }
 
+        // Shows the reports whose date or standards contain every typed word.
+        function applyReportFilter() {
+            const words = document.getElementById('reportFilter').value.toLowerCase().split(/\s+/).filter(Boolean);
+            const rows = document.querySelectorAll('#reportList .doc-item');
+            let shown = 0;
+            rows.forEach(row => {
+                const match = words.every(w => row.dataset.search.includes(w));
+                row.style.display = match ? '' : 'none';
+                if (match) shown++;
+            });
+            document.getElementById('reportFilterEmpty').style.display =
+                rows.length > 0 && shown === 0 ? 'block' : 'none';
+        }
+
         let _currentModalReportId = null;
+        let _currentModalReportText = '';
 
         // #005: show report in modal instead of appending to chat
         async function viewReport(reportId, meta) {
             try {
-                const res = await fetch(`/reports/${reportId}?user_id=${USER_ID}`);
+                const res = await fetch(`/reports/${reportId}`);
                 const data = await res.json();
                 if (!data.report_text) { showToast('Report content not found', 'error'); return; }
 
                 _currentModalReportId = reportId;
+                _currentModalReportText = data.report_text;
 
-                // Populate meta bar (#008)
+                // Populate meta bar (#008). Cleared otherwise, or it would show
+                // the previous report's date and standards.
+                const metaEl = document.getElementById('reportModalMeta');
                 if (meta) {
                     const d = new Date(meta.timestamp);
                     const stdList = (meta.standards || []).join(' · ');
-                    document.getElementById('reportModalMeta').textContent =
+                    metaEl.textContent =
                         `${d.toLocaleDateString()} ${d.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'})}  ·  ${stdList}`;
+                } else {
+                    metaEl.textContent = '';
                 }
 
-                document.getElementById('reportModalContent').innerHTML = renderMarkdown(data.report_text);
-                document.getElementById('reportModal').style.display = 'flex';
+                document.getElementById('reportModalContent').innerHTML =
+                    buildReportSummary(data.report_text) + renderMarkdown(data.report_text);
+                openModal('reportModal');
                 document.getElementById('reportModalContent').scrollTop = 0;
             } catch (e) { showToast('Failed to load report', 'error'); }
         }
 
         function closeReportModal() {
-            document.getElementById('reportModal').style.display = 'none';
+            closeModal('reportModal');
             _currentModalReportId = null;
+            _currentModalReportText = '';
+        }
+
+        function copyCurrentModalReport() {
+            if (_currentModalReportText) copyText(_currentModalReportText, 'Report copied');
+        }
+
+        // Prints only the report (see the print styles); the browser's print
+        // dialog also offers Save as PDF.
+        function printCurrentModalReport() {
+            if (!_currentModalReportId) return;
+            document.body.classList.add('print-report');
+            const done = () => {
+                document.body.classList.remove('print-report');
+                window.removeEventListener('afterprint', done);
+            };
+            window.addEventListener('afterprint', done);
+            window.print();
         }
 
         function handleReportOverlayClick(e) {
@@ -1744,7 +2308,7 @@
 
         function downloadReport(reportId) {
             const a = document.createElement('a');
-            a.href = `/reports/${reportId}/download?user_id=${USER_ID}`;
+            a.href = `/reports/${reportId}/download`;
             a.download = `report_${reportId}.md`;
             a.style.display = 'none';
             document.body.appendChild(a);
@@ -1759,7 +2323,7 @@
                 'Delete',
                 async () => {
                     try {
-                        const res = await fetch(`/reports/${reportId}?user_id=${USER_ID}`, { method: 'DELETE' });
+                        const res = await fetch(`/reports/${reportId}`, { method: 'DELETE' });
                         const data = await res.json();
                         if (res.ok) {
                             // If the deleted report is open in the modal, close it
@@ -1783,13 +2347,20 @@
         // ------------------------------------------------------------------
         async function loadAuditLogs() {
             try {
-                const res = await fetch(`/audit/logs?limit=50&user_id=${USER_ID}`);
+                // The server filters by exact action and status.
+                const params = new URLSearchParams({ limit: '50' });
+                const action = document.getElementById('auditActionFilter').value;
+                const failuresOnly = document.getElementById('auditFailuresOnly').checked;
+                if (action) params.set('action', action);
+                if (failuresOnly) params.set('status', 'failure');
+                const res = await fetch(`/audit/logs?${params}`);
                 const data = await res.json();
                 const list = document.getElementById('auditLogList');
                 const logs = data.logs || [];
 
                 if (logs.length === 0) {
-                    list.innerHTML = '<div style="font-size:0.75rem;color:var(--text-muted)">No audit events</div>';
+                    const filtered = action || failuresOnly;
+                    list.innerHTML = `<div class="empty-state">${filtered ? 'No matching audit events' : 'No audit events'}</div>`;
                     return;
                 }
 
@@ -1804,7 +2375,7 @@
                     div.innerHTML = `
                         <span class="audit-time">${time}</span>
                         <span class="audit-action">${formatAction(log.action)}</span>
-                        <span class="audit-user">${log.user_id}</span>
+                        <span class="audit-user">${escapeHtml(log.user_id)}</span>
                         ${badge}`;
                     list.appendChild(div);
                 });
@@ -1836,6 +2407,19 @@
             }
         }
 
+        // The full prompt needs two lines on a phone, where the box is one
+        // line tall, so its end was cut off and a scrollbar appeared. Shorter
+        // wording there; it changes back when the window is widened.
+        const NARROW_SCREEN = window.matchMedia('(max-width: 600px)');
+        const PLACEHOLDER_FULL = 'Ask about compliance standards, regulations, or your documents...';
+        const PLACEHOLDER_SHORT = 'Ask about compliance...';
+
+        function updateInputPlaceholder() {
+            document.getElementById('messageInput').placeholder =
+                NARROW_SCREEN.matches ? PLACEHOLDER_SHORT : PLACEHOLDER_FULL;
+        }
+        NARROW_SCREEN.addEventListener('change', updateInputPlaceholder);
+
         function autoGrowInput(el) {
             el.style.height = 'auto';
             el.style.height = Math.min(el.scrollHeight, 136) + 'px';  // cap matches CSS max-height
@@ -1857,7 +2441,7 @@
             const sendBtn = document.getElementById('sendButton');
             sendBtn.disabled = true;
             input.disabled = true;
-            showTyping(true);
+            const stopTyping = startTyping();
 
             const logsContent = document.getElementById('logsContent');
             logsContent.innerHTML = '<div class="log-entry">Processing...</div>';
@@ -1866,22 +2450,24 @@
                 const response = await fetch('/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message, verbose: true, user_id: USER_ID })
+                    body: JSON.stringify({ message, verbose: true })
                 });
                 const data = await response.json();
-                showTyping(false);
+                stopTyping();
 
-                if (data.error) {
+                if (data.error && !data.response) {
                     addMessage('agent', `**Error:** ${data.error}`);
                 } else {
                     let txt = data.response;
+                    // Some steps can fail while others answer; show both.
+                    if (data.error) txt += `\n\n> **Note:** part of this request failed: ${data.error}`;
                     if (data.strategy) txt += `\n\n---\n*Strategy: ${data.strategy}${data.steps > 0 ? `, Steps: ${data.steps}` : ''}*`;
                     addMessage('agent', txt);
                     if (data.logs) displayLogs(data.logs);
                 }
                 loadAuditLogs();
             } catch (error) {
-                showTyping(false);
+                stopTyping();
                 addMessage('agent', `**Error:** ${error.message}`);
             } finally {
                 _chatInFlight = false;
@@ -1896,11 +2482,55 @@
         // ------------------------------------------------------------------
         function addMessage(sender, content) {
             const container = document.getElementById('chatMessages');
+            const wasNearBottom = isChatNearBottom();
+            const div = buildMessage(sender, content, new Date());
+            container.appendChild(div);
+            // Your own message always comes into view, and so does a reply if
+            // you were at the bottom. If you had scrolled up to read, the view
+            // stays put and a button offers to jump to the new message.
+            if (sender === 'user' || wasNearBottom) revealMessage(div);
+            else document.getElementById('jumpLatest').classList.add('show');
+            return div;
+        }
+
+        function isChatNearBottom() {
+            const c = document.getElementById('chatMessages');
+            return c.scrollHeight - c.scrollTop - c.clientHeight < 80;
+        }
+
+        // A reply taller than the chat area opens at its start, so a long
+        // report is read from the top rather than from its last line.
+        function revealMessage(div) {
+            const c = document.getElementById('chatMessages');
+            if (div.offsetHeight > c.clientHeight) {
+                c.scrollTop += div.getBoundingClientRect().top - c.getBoundingClientRect().top - 12;
+            } else {
+                c.scrollTop = c.scrollHeight;
+            }
+            document.getElementById('jumpLatest').classList.remove('show');
+        }
+
+        function scrollChatToBottom() {
+            const c = document.getElementById('chatMessages');
+            c.scrollTop = c.scrollHeight;
+            document.getElementById('jumpLatest').classList.remove('show');
+        }
+
+        // The jump button goes once you scroll down to the newest message.
+        function setupChatScroll() {
+            document.getElementById('chatMessages').addEventListener('scroll', () => {
+                if (isChatNearBottom()) document.getElementById('jumpLatest').classList.remove('show');
+            });
+        }
+
+        // A message element; `when` is the time it was sent.
+        function buildMessage(sender, content, when) {
             const div = document.createElement('div');
             div.className = `message ${sender}-message`;
 
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+            const time = when.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+            const sameDay = when.toDateString() === new Date().toDateString();
+            const timeStr = sameDay ? time : `${when.toLocaleDateString()} ${time}`;
 
             const headerLabel = sender === 'user' ? 'You' : 'Agent';
             const rendered = sender === 'agent' ? renderMarkdown(content) : escapeHtml(content);
@@ -1909,8 +2539,75 @@
                 <div class="msg-header">${headerLabel}</div>
                 <div class="msg-bubble">${rendered}</div>
                 <div class="msg-time">${timeStr}</div>`;
-            container.appendChild(div);
-            container.scrollTop = container.scrollHeight;
+
+            // Copies the answer as written (Markdown), not the rendered page.
+            if (sender === 'agent') {
+                const copyBtn = document.createElement('button');
+                copyBtn.className = 'msg-copy-btn';
+                copyBtn.textContent = 'Copy';
+                copyBtn.setAttribute('aria-label', 'Copy this answer');
+                copyBtn.addEventListener('click', () => copyText(content, 'Answer copied'));
+                div.querySelector('.msg-time').appendChild(copyBtn);
+            }
+            return div;
+        }
+
+        // Earlier exchanges after a reload: under the welcome message, oldest
+        // first, so the newest answer is at the bottom where the view lands.
+        // Put straight after the welcome, so a message sent while this loads
+        // stays below them.
+        async function loadChatHistory(welcomeEl) {
+            try {
+                const res = await fetch('/chat/history');
+                if (!res.ok) return;
+                const data = await res.json();
+                const history = data.history || [];
+                if (history.length === 0) return;
+
+                const fragment = document.createDocumentFragment();
+                const divider = document.createElement('div');
+                divider.className = 'history-divider';
+                divider.textContent = 'Earlier conversation';
+                fragment.appendChild(divider);
+                history.forEach(h => {
+                    const when = new Date(h.timestamp);
+                    fragment.appendChild(buildMessage('user', h.query, when));
+                    fragment.appendChild(buildMessage('agent', h.response, when));
+                });
+
+                const container = document.getElementById('chatMessages');
+                if (welcomeEl && welcomeEl.isConnected) welcomeEl.after(fragment);
+                else container.prepend(fragment);
+                scrollChatToBottom();
+            } catch (e) { console.error('Error loading chat history:', e); }
+        }
+
+        // The clipboard API needs a secure context (https or localhost); the
+        // older copy command covers a plain-http address on the network.
+        async function copyText(text, doneMessage) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    // Selecting the hidden text takes focus; give it back after,
+                    // or keyboard users are thrown out of the report window.
+                    const previous = document.activeElement;
+                    const area = document.createElement('textarea');
+                    area.value = text;
+                    area.setAttribute('readonly', '');
+                    area.style.position = 'fixed';
+                    area.style.opacity = '0';
+                    document.body.appendChild(area);
+                    area.select();
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(area);
+                    if (previous && typeof previous.focus === 'function') previous.focus();
+                    if (!ok) throw new Error('copy command refused');
+                }
+                showToast(doneMessage, 'success');
+            } catch (e) {
+                showToast('Could not copy to the clipboard', 'error');
+            }
         }
 
         function renderMarkdown(text) {
@@ -1929,12 +2626,27 @@
                 return `%%CODEBLOCK_${codeBlocks.length - 1}%%`;
             });
 
-            // Inline code
-            html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+            // Inline code, also protected, so links and emphasis leave it alone
+            const inlineCode = [];
+            html = html.replace(/`([^`\n]+)`/g, (_, code) => {
+                inlineCode.push(`<code>${code}</code>`);
+                return `%%INLINECODE_${inlineCode.length - 1}%%`;
+            });
+
+            // Links: [text](url) and bare web addresses. Only http(s), so a
+            // "javascript:" link can't be made; quote marks and angle brackets
+            // end an address, so it can't break out of the href attribute.
+            const link = (url, label) =>
+                `<a href="${url}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+            html = html.replace(/\[([^\]\n]+)\]\((https?:\/\/[^\s)"<>]+)\)/g, (_, label, url) => link(url, label));
+            html = html.replace(/(^|[\s(])(https?:\/\/[^\s<>"]*[^\s<>".,;:!?)\]])/gm,
+                (_, lead, url) => lead + link(url, url));
+
             // Bold / italic
             html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
             html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
             // Headers
+            html = html.replace(/^#### (.+)$/gm, '<h4>$1</h4>');
             html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
             html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
             html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
@@ -1943,28 +2655,41 @@
             // Blockquote
             html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
 
-            // Lists: collapse blank lines between list items before converting,
-            // so \n\n between bullets doesn't produce stray <p> tags later.
-            html = html.replace(/((?:^[\-\*] .+$\n?)(?:\n(?=[\-\*] ))?)+/gm, block => {
-                const items = block.split('\n')
-                    .filter(l => /^[\-\*] /.test(l))
-                    .map(l => `<li>${l.replace(/^[\-\*] /, '')}</li>`)
-                    .join('');
-                return `<ul>${items}</ul>`;
-            });
-            html = html.replace(/((?:^\d+\. .+$\n?)(?:\n(?=\d+\. ))?)+/gm, block => {
-                const items = block.split('\n')
-                    .filter(l => /^\d+\. /.test(l))
-                    .map(l => `<li>${l.replace(/^\d+\. /, '')}</li>`)
-                    .join('');
-                return `<ol>${items}</ol>`;
-            });
+            // Lists, including indented sub-lists: an indented bullet used to
+            // fall out of the list and keep its "- " as text. A single blank
+            // line between items keeps one list together.
+            {
+                const sourceLines = html.split('\n');
+                const kept = [];
+                let run = [];
+                const flushRun = () => {
+                    if (run.length) kept.push(buildListHtml(run));
+                    run = [];
+                };
+                for (let i = 0; i < sourceLines.length; i++) {
+                    const item = sourceLines[i].match(LIST_LINE);
+                    if (item) {
+                        run.push({
+                            indent: item[1].replace(/\t/g, '  ').length,
+                            ordered: /^\d/.test(item[2]),
+                            text: item[3].trim(),
+                        });
+                    } else if (run.length && !sourceLines[i].trim() && LIST_LINE.test(sourceLines[i + 1] || '')) {
+                        continue;  // blank line between items
+                    } else {
+                        flushRun();
+                        kept.push(sourceLines[i]);
+                    }
+                }
+                flushRun();
+                html = kept.join('\n');
+            }
 
             // Tables
             html = html.replace(/\|(.+)\|\n\|[-| :]+\|\n((?:\|.+\|\n?)*)/g, (_, header, body) => {
-                const ths = header.split('|').filter(c => c.trim()).map(c => `<th>${c.trim()}</th>`).join('');
+                const ths = splitTableRow(`|${header}|`).map(c => `<th>${c}</th>`).join('');
                 const rows = body.trim().split('\n').map(row => {
-                    const tds = row.split('|').filter(c => c.trim()).map(c => `<td>${c.trim()}</td>`).join('');
+                    const tds = splitTableRow(row).map(c => `<td>${c}</td>`).join('');
                     return `<tr>${tds}</tr>`;
                 }).join('');
                 return `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
@@ -1975,28 +2700,49 @@
             // Risk level shown as a standalone table cell
             html = html.replace(/<td>(Critical|High|Medium|Low)<\/td>/g,
                 (_, lvl) => `<td><span class="risk-badge ${riskClass(lvl)}">${lvl}</span></td>`);
-            // Priority band shown as a standalone table cell
-            html = html.replace(/<td>(Immediate[^<]*|Short-term|Medium-term|Long-term)<\/td>/g,
+            // Priority band shown as a standalone table cell. Bands carry
+            // wording after the name ("Medium-term action", "Long-term
+            // (escalated)"), which an exact match missed.
+            html = html.replace(/<td>((?:Immediate|Short-term|Medium-term|Long-term)[^<]*)<\/td>/g,
                 (_, band) => `<td><span class="prio-badge">${band}</span></td>`);
             // Inline "Risk Level: <level>" outside tables (plain or with trailing bold tag)
             html = html.replace(/(Risk Level:?(?:<\/strong>)?:?\s*)(Critical|High|Medium|Low)\b/g,
                 (_, pre, lvl) => `${pre}<span class="risk-badge ${riskClass(lvl)}">${lvl}</span>`);
 
-            // Paragraphs: only split on double newlines that aren't already inside block elements
-            html = html.replace(/\n\n+/g, '</p><p>');
-            html = html.replace(/\n/g, '<br>');
-            html = `<p>${html}</p>`;
-
-            // Clean up: remove empty <p> and unwrap block elements from <p>
-            html = html.replace(/<p>\s*<\/p>/g, '');
-            ['h1','h2','h3','ul','ol','table','pre','hr','blockquote'].forEach(tag => {
-                html = html.replace(new RegExp(`<p>(<${tag}[^>]*>)`, 'g'), '$1');
-                html = html.replace(new RegExp(`(</${tag}>)<\\/p>`, 'g'), '$1');
+            // Paragraphs. Block elements go on lines of their own; the other
+            // lines are grouped into paragraphs, split at blank lines. Turning
+            // every newline into <br> used to leave line breaks after headings,
+            // tables and lists, and unmatched <p> tags, which showed as gaps.
+            const BLOCK_TAGS = 'h1|h2|h3|h4|ul|ol|table|blockquote|div';
+            html = html
+                .replace(new RegExp(`(</(?:${BLOCK_TAGS})>|<hr>)`, 'g'), '$1\n')
+                .replace(new RegExp(`(<(?:${BLOCK_TAGS})[\\s>]|<hr>)`, 'g'), '\n$1');
+            // Closing tags and <li> count too: a nested list is split across
+            // lines by the two replacements above, and a line starting with
+            // "</li>" or "</ul>" must not be wrapped in a paragraph.
+            const isBlock = new RegExp(`^(</?(?:${BLOCK_TAGS}|li)[\\s>]|<hr>|%%CODEBLOCK_\\d+%%$)`);
+            const out = [];
+            let para = [];
+            const flush = () => {
+                if (para.length) out.push(`<p>${para.join('<br>')}</p>`);
+                para = [];
+            };
+            html.split('\n').forEach(line => {
+                const t = line.trim();
+                if (!t) flush();
+                else if (isBlock.test(t)) { flush(); out.push(t); }
+                else para.push(t);
             });
+            flush();
+            html = out.join('');
 
-            // Restore code blocks
+            // Restore code. A function, not a string, as the replacement: in a
+            // replacement string "$&" or "$1" in the code would be substituted.
             codeBlocks.forEach((block, i) => {
-                html = html.replace(`%%CODEBLOCK_${i}%%`, block);
+                html = html.replace(`%%CODEBLOCK_${i}%%`, () => block);
+            });
+            inlineCode.forEach((code, i) => {
+                html = html.replace(`%%INLINECODE_${i}%%`, () => code);
             });
 
             return html;
@@ -2008,11 +2754,155 @@
             return div.innerHTML;
         }
 
+        // For a value inside a double-quoted attribute: escapeHtml leaves
+        // quote marks alone, and one would end the attribute early.
+        function escapeAttr(text) {
+            return escapeHtml(text).replace(/"/g, '&quot;');
+        }
+
+        // A bullet or numbered line, with however much it is indented.
+        const LIST_LINE = /^([ \t]*)([-*]|\d+\.)[ \t]+(.*)$/;
+
+        // Nested <ul>/<ol> markup from list items and their indent levels.
+        // Two spaces (or a tab) is one level deeper. The first level is never
+        // closed early, so an oddly indented first item cannot split the list.
+        function buildListHtml(items) {
+            let html = '';
+            const open = [];
+            for (const item of items) {
+                const tag = item.ordered ? 'ol' : 'ul';
+                while (open.length > 1 && item.indent < open[open.length - 1].indent) {
+                    html += `</li></${open.pop().tag}>`;
+                }
+                const current = open[open.length - 1];
+                if (!current || item.indent > current.indent) {
+                    html += `<${tag}><li>`;
+                    open.push({ indent: item.indent, tag });
+                } else if (current.tag !== tag) {
+                    html += `</li></${open.pop().tag}><${tag}><li>`;
+                    open.push({ indent: item.indent, tag });
+                } else {
+                    html += '</li><li>';
+                }
+                html += item.text;
+            }
+            while (open.length) html += `</li></${open.pop().tag}>`;
+            return html;
+        }
+
+        // Cells of one Markdown table row. Strips only the outer pipes:
+        // dropping every blank piece also dropped empty cells, which moved
+        // later cells under the wrong column.
+        function splitTableRow(row) {
+            return row.trim().replace(/^\|/, '').replace(/\|$/, '').split('|').map(c => c.trim());
+        }
+
+        // Every Markdown table in a text, as { section, header, rows }: the
+        // heading it sits under (lower case) and its cell strings.
+        function parseMarkdownTables(text) {
+            const lines = (text || '').split('\n');
+            const isRow = l => /^\s*\|.*\|\s*$/.test(l);
+            const isSeparator = l => /^\s*\|[-| :]+\|\s*$/.test(l);
+            const tables = [];
+            let section = '';
+            for (let i = 0; i < lines.length - 1; i++) {
+                const heading = lines[i].match(/^\s*#{1,6}\s+(.*)$/);
+                if (heading) { section = heading[1].toLowerCase(); continue; }
+                if (!isRow(lines[i]) || !isSeparator(lines[i + 1])) continue;
+                const header = splitTableRow(lines[i]).map(c => c.toLowerCase());
+                const rows = [];
+                let j = i + 2;
+                while (j < lines.length && isRow(lines[j])) rows.push(splitTableRow(lines[j++]));
+                tables.push({ section, header, rows });
+                i = j - 1;
+            }
+            return tables;
+        }
+
+        // A summary card counted from the report's own Standards Coverage and
+        // risk score tables. Empty when neither table is found, so nothing is
+        // guessed from free text.
+        function buildReportSummary(reportText) {
+            const tables = parseMarkdownTables(reportText);
+            const lines = [];
+
+            // The table under the Standards Coverage heading; any other table
+            // with Standard and Status columns only if that heading is missing.
+            const hasStandardStatus = t => t.header.includes('standard') && t.header.includes('status');
+            const coverage = tables.find(t => hasStandardStatus(t) && t.section.includes('standards coverage'))
+                || tables.find(hasStandardStatus);
+            if (coverage && coverage.rows.length) {
+                const col = coverage.header.indexOf('status');
+                const counts = { findings: 0, gap: 0, na: 0, other: 0 };
+                coverage.rows.forEach(r => {
+                    const status = (r[col] || '').toLowerCase();
+                    if (status.includes('not applicable')) counts.na++;
+                    else if (status.includes('documentation gap')) counts.gap++;
+                    else if (status.includes('finding')) counts.findings++;
+                    else counts.other++;
+                });
+                const parts = [
+                    `<span class="report-summary-label">Standards</span> ${coverage.rows.length} evaluated:`,
+                    `${counts.findings} with findings,`,
+                    `${counts.gap} documentation ${counts.gap === 1 ? 'gap' : 'gaps'},`,
+                    `${counts.na} not applicable`,
+                ];
+                if (counts.other) parts[parts.length - 1] += `, ${counts.other} other`;
+                lines.push(`<div class="report-summary-row">${parts.join(' ')}</div>`);
+            }
+
+            // The risk table is the one with S, L and G columns, as the
+            // server's risk score check identifies it.
+            const risk = tables.find(t => ['s', 'l', 'g'].every(k => t.header.includes(k)));
+            if (risk && risk.rows.length) {
+                const col = risk.header.findIndex(h => h.includes('band') || h.includes('priority'));
+                if (col !== -1) {
+                    const bands = [
+                        { name: 'Immediate', cls: 'risk-critical', n: 0 },
+                        { name: 'Medium-term', cls: 'risk-medium', n: 0 },
+                        { name: 'Long-term', cls: 'risk-low', n: 0 },
+                    ];
+                    let escalated = 0;
+                    risk.rows.forEach(r => {
+                        const cell = (r[col] || '').toLowerCase();
+                        const band = bands.find(b => cell.includes(b.name.toLowerCase()));
+                        if (band) band.n++;
+                        if (cell.includes('escalated')) escalated++;
+                    });
+                    const pills = bands.map(b =>
+                        `<span class="risk-badge ${b.cls}">${b.n} ${b.name}</span>`).join(' ');
+                    const note = escalated ? ` (${escalated} escalated)` : '';
+                    const gapWord = risk.rows.length === 1 ? 'gap' : 'gaps';
+                    lines.push(`<div class="report-summary-row"><span class="report-summary-label">${risk.rows.length} ${gapWord} by priority</span> ${pills}${note}</div>`);
+                }
+            }
+
+            if (!lines.length) return '';
+            return `<div class="report-summary" role="group" aria-label="Report summary">
+                <div class="report-summary-title">Summary from the report's tables</div>
+                ${lines.join('')}
+            </div>`;
+        }
+
         // ------------------------------------------------------------------
         // Typing Indicator
         // ------------------------------------------------------------------
+        // Chat and evaluation share the indicator, so it counts open requests:
+        // a chat reply arriving during an evaluation used to hide it while the
+        // evaluation was still running.
+        let _typingCount = 0;
+
+        // Shows the indicator for one request; the returned function hides it
+        // for that request, and does nothing if called again.
+        function startTyping() {
+            showTyping(true);
+            let open = true;
+            return () => { if (open) { open = false; showTyping(false); } };
+        }
+
         function showTyping(show) {
-            document.getElementById('typingIndicator').classList.toggle('show', show);
+            _typingCount = Math.max(0, _typingCount + (show ? 1 : -1));
+            document.getElementById('typingIndicator').classList.toggle('show', _typingCount > 0);
             if (show) {
                 const msgs = document.getElementById('chatMessages');
                 msgs.scrollTop = msgs.scrollHeight;
@@ -2028,7 +2918,9 @@
             logs.forEach(log => {
                 const div = document.createElement('div');
                 div.className = 'log-entry';
-                div.innerHTML = log.replace(/\[(\d{2}:\d{2}:\d{2})\]/, '<span class="log-time">[$1]</span>');
+                // Log lines carry user input and model output, so escape before
+                // adding the timestamp markup.
+                div.innerHTML = escapeHtml(log).replace(/\[(\d{2}:\d{2}:\d{2})\]/, '<span class="log-time">[$1]</span>');
                 container.appendChild(div);
             });
             container.scrollTop = container.scrollHeight;
@@ -2043,18 +2935,17 @@
                 'Clear the current conversation history and reset the agent session?',
                 'Reset',
                 async () => {
-            try {
-                await fetch('/reset', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ user_id: USER_ID })
-                });
-                document.getElementById('chatMessages').innerHTML = '';
-                document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
-                showWelcomeMessage(CURRENT_USER.name);
-                loadAuditLogs();
-                showToast('Session reset', 'info');
-            } catch (e) { showToast('Failed to reset session', 'error'); }
+                    try {
+                        const res = await fetch('/reset', { method: 'POST' });
+                        // Only clear the screen once the server has cleared the
+                        // history; otherwise a reload would bring it all back.
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        document.getElementById('chatMessages').innerHTML = '';
+                        document.getElementById('logsContent').innerHTML = '<div class="log-entry">Ready.</div>';
+                        showWelcomeMessage(CURRENT_USER.name);
+                        loadAuditLogs();
+                        showToast('Session reset', 'info');
+                    } catch (e) { showToast('Failed to reset session', 'error'); }
                 }
             );
         }
@@ -2073,9 +2964,19 @@
             return tip;
         })();
 
+        // Shown on hover and on keyboard focus.
         document.addEventListener('mouseover', e => {
             const badge = e.target.closest('.std-badge');
-            if (!badge) return;
+            if (badge) showStdTooltip(badge);
+        });
+        document.addEventListener('focusin', e => {
+            if (e.target.classList && e.target.classList.contains('std-badge')) showStdTooltip(e.target);
+        });
+        document.addEventListener('focusout', e => {
+            if (e.target.classList && e.target.classList.contains('std-badge')) _stdTooltipEl.style.display = 'none';
+        });
+
+        function showStdTooltip(badge) {
             const rect = badge.getBoundingClientRect();
             _stdTooltipEl.innerHTML = badge.dataset.stds || '';
             _stdTooltipEl.style.display = 'block';
@@ -2085,7 +2986,7 @@
             if (left < 8) left = 8;
             _stdTooltipEl.style.left = left + 'px';
             _stdTooltipEl.style.top = (rect.top - _stdTooltipEl.offsetHeight - 6) + 'px';
-        });
+        }
 
         document.addEventListener('mouseout', e => {
             if (e.target.closest('.std-badge')) _stdTooltipEl.style.display = 'none';
@@ -2103,11 +3004,12 @@
             btn.textContent = confirmLabel;
             _confirmCallback = onConfirm;
             btn.onclick = () => { const cb = _confirmCallback; closeConfirmModal(); if (cb) cb(); };
-            document.getElementById('confirmModal').style.display = 'flex';
+            // Focus starts on Cancel, so Enter on a destructive prompt is safe.
+            openModal('confirmModal', '.btn-cancel');
         }
 
         function closeConfirmModal() {
-            document.getElementById('confirmModal').style.display = 'none';
+            closeModal('confirmModal');
             _confirmCallback = null;
         }
 
@@ -2116,15 +3018,82 @@
         }
 
         // ------------------------------------------------------------------
+        // Modal keyboard support: focus moves in on open and back to what
+        // opened it on close, Tab stays inside, Escape closes.
+        // ------------------------------------------------------------------
+        const _modalReturnFocus = {};
+        // a[href], not [href]: the icons' <use href> would otherwise count.
+        const FOCUSABLE = 'button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])';
+
+        function openModal(id, focusSelector) {
+            const overlay = document.getElementById(id);
+            if (overlay.style.display !== 'flex') _modalReturnFocus[id] = document.activeElement;
+            overlay.style.display = 'flex';
+            const target = (focusSelector && overlay.querySelector(focusSelector))
+                || overlay.querySelector(FOCUSABLE);
+            if (target) target.focus();
+        }
+
+        function closeModal(id) {
+            const overlay = document.getElementById(id);
+            if (overlay.style.display === 'none') return;
+            overlay.style.display = 'none';
+            const back = _modalReturnFocus[id];
+            delete _modalReturnFocus[id];
+            // The opener may have been removed, e.g. a deleted report's row.
+            if (back && back.isConnected && typeof back.focus === 'function') back.focus();
+        }
+
+        function topOpenModal() {
+            return ['confirmModal', 'reportModal']
+                .map(id => document.getElementById(id))
+                .find(el => el.style.display === 'flex') || null;
+        }
+
+        document.addEventListener('keydown', e => {
+            const overlay = topOpenModal();
+            if (!overlay) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (overlay.id === 'confirmModal') closeConfirmModal();
+                else closeReportModal();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            const items = Array.from(overlay.querySelectorAll(FOCUSABLE))
+                .filter(el => el instanceof HTMLElement && !el.disabled && el.offsetParent !== null);
+            if (items.length === 0) return;
+            const first = items[0], last = items[items.length - 1];
+            if (e.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+
+        // ------------------------------------------------------------------
         // Toast
         // ------------------------------------------------------------------
+        // Errors stay up twice as long (their fade-out is timed to match in
+        // the CSS), and any notice can be closed straight away.
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
             const toast = document.createElement('div');
             toast.className = `toast ${type}`;
-            toast.textContent = message;
+            const text = document.createElement('span');
+            text.className = 'toast-text';
+            text.textContent = message;
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'toast-close';
+            close.setAttribute('aria-label', 'Dismiss notification');
+            close.innerHTML = iconSvg('x');
+            close.addEventListener('click', () => toast.remove());
+            toast.append(text, close);
             container.appendChild(toast);
-            setTimeout(() => { if (toast.parentNode) toast.remove(); }, 4200);
+            setTimeout(() => { if (toast.parentNode) toast.remove(); }, type === 'error' ? 8200 : 4200);
         }
     </script>
 </body>

@@ -2,6 +2,7 @@ import os
 import json
 import uuid
 import shutil
+import threading
 from datetime import datetime
 from typing import List, Dict, Any
 from utils.logger import logger_instance
@@ -25,6 +26,8 @@ class UploadManager:
         self.parser = DocumentParser()
         self.chunker = DocumentChunker()
         self.logger = logger_instance.get_logger("upload_manager")
+        self._manifest_locks: Dict[str, threading.Lock] = {}
+        self._locks_guard = threading.Lock()
 
         os.makedirs(self.upload_dir, exist_ok=True)
 
@@ -88,31 +91,39 @@ class UploadManager:
         metadatas = [c["metadata"] for c in chunks]
         ids = [f"{doc_id}_chunk_{i}" for i in range(len(chunks))]
 
-        self.vector_store.add_company_documents(
-            user_id=user_id,
-            documents=documents,
-            metadatas=metadatas,
-            ids=ids,
-        )
-
         user_dir = os.path.join(self.upload_dir, user_id)
-        os.makedirs(user_dir, exist_ok=True)
-
         stored_filename = f"{doc_id}_{safe_name}"
         stored_path = os.path.join(user_dir, stored_filename)
-        if file_path != stored_path:
-            shutil.copy2(file_path, stored_path)
 
-        doc_record = {
-            "doc_id": doc_id,
-            "original_filename": safe_name,
-            "stored_filename": stored_filename,
-            "uploaded_at": datetime.now().isoformat(),
-            "file_size": file_size,
-            "chunk_count": len(chunks),
-            "char_count": len(text),
-        }
-        self._update_manifest(user_id, doc_record)
+        # Chunks, stored file and manifest entry succeed together or not at
+        # all. A failure after the chunks were stored used to leave them
+        # searchable but missing from the document list, so they could never
+        # be deleted.
+        try:
+            self.vector_store.add_company_documents(
+                user_id=user_id,
+                documents=documents,
+                metadatas=metadatas,
+                ids=ids,
+            )
+
+            os.makedirs(user_dir, exist_ok=True)
+            if file_path != stored_path:
+                shutil.copy2(file_path, stored_path)
+
+            doc_record = {
+                "doc_id": doc_id,
+                "original_filename": safe_name,
+                "stored_filename": stored_filename,
+                "uploaded_at": datetime.now().isoformat(),
+                "file_size": file_size,
+                "chunk_count": len(chunks),
+                "char_count": len(text),
+            }
+            self._update_manifest(user_id, doc_record)
+        except Exception:
+            self._discard_partial_upload(user_id, doc_id, stored_path, file_path)
+            raise
 
         self.logger.info(
             f"Upload complete: {safe_name} -> "
@@ -128,13 +139,30 @@ class UploadManager:
             "neutralised_instructions": len(neutralised),
         }
 
+    def _discard_partial_upload(self, user_id, doc_id, stored_path, source_path):
+        """Remove whatever a failed upload managed to write."""
+        try:
+            self.vector_store.delete_company_document(user_id, doc_id)
+        except Exception as e:
+            self.logger.error(f"Could not remove chunks of failed upload {doc_id}: {e}")
+        if stored_path != source_path and os.path.exists(stored_path):
+            os.remove(stored_path)
+
     def list_documents(self, user_id: str) -> List[Dict[str, Any]]:
         """List all documents uploaded by a user."""
         manifest = self._load_manifest(user_id)
         return manifest.get("documents", [])
 
     def delete_document(self, user_id: str, doc_id: str) -> bool:
-        """Delete a specific document: its vector store chunks, backing file, and manifest entry."""
+        """Delete a specific document: its vector store chunks, backing file, and manifest entry.
+
+        Raises if the chunks cannot be removed, leaving the file and the
+        manifest entry in place so the user can retry.
+        """
+        with self._manifest_lock(user_id):
+            return self._delete_document_locked(user_id, doc_id)
+
+    def _delete_document_locked(self, user_id: str, doc_id: str) -> bool:
         manifest = self._load_manifest(user_id)
         documents = manifest.get("documents", [])
 
@@ -190,11 +218,21 @@ class UploadManager:
         user_dir = os.path.join(self.upload_dir, user_id)
         os.makedirs(user_dir, exist_ok=True)
         manifest_path = os.path.join(user_dir, "manifest.json")
-        with open(manifest_path, "w", encoding="utf-8") as f:
+        # Write then swap, so an interrupted save cannot truncate the manifest.
+        tmp_path = f"{manifest_path}.tmp"
+        with open(tmp_path, "w", encoding="utf-8") as f:
             json.dump(manifest, f, indent=2)
+        os.replace(tmp_path, manifest_path)
 
     def _update_manifest(self, user_id: str, doc_record: Dict[str, Any]):
         """Add a document record to the user's manifest."""
-        manifest = self._load_manifest(user_id)
-        manifest["documents"].append(doc_record)
-        self._save_manifest(user_id, manifest)
+        with self._manifest_lock(user_id):
+            manifest = self._load_manifest(user_id)
+            manifest["documents"].append(doc_record)
+            self._save_manifest(user_id, manifest)
+
+    def _manifest_lock(self, user_id: str) -> threading.Lock:
+        """One lock per user, so two concurrent uploads cannot both read the
+        manifest, append, and have the second write drop the first record."""
+        with self._locks_guard:
+            return self._manifest_locks.setdefault(user_id, threading.Lock())

@@ -1,6 +1,7 @@
 import json
 import csv
 import os
+import sys
 import uuid
 import hashlib
 import threading
@@ -32,6 +33,17 @@ class AuditEntry(BaseModel):
     status: str = "success"
     prev_hash: str = ""
     entry_hash: str = ""
+
+
+def _csv_safe(value: Any) -> Any:
+    """Stop a spreadsheet treating a logged value as a formula.
+
+    resource_id comes from the request URL, so a crafted id such as
+    "=HYPERLINK(...)" would run when the export is opened in Excel.
+    """
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
 
 
 def compute_entry_hash(payload: Dict[str, Any]) -> str:
@@ -148,13 +160,25 @@ class AuditLogger:
         unchained = 0
         verified = 0
         expected_prev = GENESIS_HASH
+        chain_started = False
         problems = []
 
         for position, record in enumerate(entries):
             stored = record.get("entry_hash")
             if not stored:
-                unchained += 1
+                # Legacy entries can only precede the chain. One without hash
+                # fields after it began has had them stripped, which otherwise
+                # let the final entry be edited without detection.
+                if chain_started:
+                    problems.append({
+                        "position": position,
+                        "event_id": record.get("event_id"),
+                        "problem": "hash fields missing after the chain began",
+                    })
+                else:
+                    unchained += 1
                 continue
+            chain_started = True
 
             recomputed = compute_entry_hash(record)
             if recomputed != stored:
@@ -207,6 +231,10 @@ class AuditLogger:
         if start_date:
             entries = [e for e in entries if e["timestamp"] >= start_date]
         if end_date:
+            # Timestamps are compared as ISO strings, so a bare date such as
+            # "2026-11-04" sorted before every entry made that day.
+            if len(end_date) == 10:
+                end_date = f"{end_date}T23:59:59.999999"
             entries = [e for e in entries if e["timestamp"] <= end_date]
 
         entries.sort(key=lambda x: x["timestamp"], reverse=True)
@@ -239,7 +267,8 @@ class AuditLogger:
 
     def export_csv(self, filepath: str, **filters) -> str:
         """Export filtered audit entries to a CSV file and return the path."""
-        entries = self.query(**filters, limit=10000)
+        # Every matching entry: a fixed cap silently truncated the export.
+        entries = self.query(**filters, limit=sys.maxsize)
         if not entries:
             return filepath
 
@@ -254,7 +283,7 @@ class AuditLogger:
             for entry in entries:
                 row = {k: entry.get(k, "") for k in fieldnames}
                 row["details"] = json.dumps(entry.get("details", {}))
-                writer.writerow(row)
+                writer.writerow({k: _csv_safe(v) for k, v in row.items()})
 
         self.logger.info(f"Exported {len(entries)} audit entries to {filepath}")
         return filepath
@@ -284,6 +313,9 @@ class AuditLogger:
 
     def _read_all_entries(self) -> List[Dict[str, Any]]:
         """Read all entries from the audit log file, newest first."""
-        entries = self._read_raw_entries()
+        # Reversed before the sort: the sort is stable, so entries sharing a
+        # timestamp (the clock can repeat within a few milliseconds) keep
+        # their order, which must be newest first rather than file order.
+        entries = list(reversed(self._read_raw_entries()))
         entries.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
         return entries

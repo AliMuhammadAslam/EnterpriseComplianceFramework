@@ -3,21 +3,26 @@ import sys
 import signal
 import atexit
 import tempfile
-import io
+import threading
+import time
+import uuid
 from functools import wraps
-from datetime import datetime
-from contextlib import redirect_stdout
+from urllib.parse import urlsplit
 
 from flask import (
     Flask, render_template, request, jsonify, session, redirect, url_for
 )
+from werkzeug.exceptions import HTTPException
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from agent.orchestrator import Orchestrator
 from audit.audit_logger import AuditLogger
 from evaluation.report_store import ReportStore
+from evaluation.engine import DEFAULT_STANDARDS
 from auth.user_store import UserStore
+from utils.output_capture import capture_output
+from utils.logger import logger_instance
 
 app = Flask(__name__)
 
@@ -33,7 +38,101 @@ if not app.secret_key:
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    # Send the session cookie over HTTPS only. Off by default because the app
+    # runs on plain http locally; set SESSION_COOKIE_SECURE=true when served
+    # over HTTPS, or the cookie can travel unencrypted.
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() == "true",
+    # Reject an oversized request before it is read. Without a cap, a body of
+    # any size was received and written to disk before the upload size check
+    # ran. One extra MB allows for the multipart encoding around the file.
+    MAX_CONTENT_LENGTH=(int(os.getenv("MAX_UPLOAD_SIZE_MB", "50")) + 1) * 1024 * 1024,
 )
+
+logger = logger_instance.get_logger("web_app")
+
+
+def _positive_int_env(name, default):
+    """A positive whole number from the environment, or the default."""
+    try:
+        value = int(os.getenv(name, str(default)))
+    except ValueError:
+        return default
+    return value if value > 0 else default
+
+
+# Sign-in lockout: failed attempts are counted per account and per address
+# within the lockout window. The per-address limit is higher so one office
+# behind a shared address is not locked out by a few mistyped passwords.
+LOGIN_MAX_ATTEMPTS = _positive_int_env("LOGIN_MAX_ATTEMPTS", 5)
+LOGIN_IP_MAX_ATTEMPTS = _positive_int_env("LOGIN_IP_MAX_ATTEMPTS", 20)
+LOGIN_LOCKOUT_SECONDS = _positive_int_env("LOGIN_LOCKOUT_MINUTES", 15) * 60
+
+# A session ends after this long without a request, and after this long in
+# total even if it is in use.
+SESSION_IDLE_SECONDS = _positive_int_env("SESSION_IDLE_MINUTES", 30) * 60
+SESSION_MAX_SECONDS = _positive_int_env("SESSION_MAX_HOURS", 8) * 3600
+
+# Extra origins (scheme://host:port) allowed to send state-changing requests,
+# for a deployment where the public address differs from the Host header.
+TRUSTED_ORIGINS = {
+    o.strip().rstrip("/").lower()
+    for o in os.getenv("TRUSTED_ORIGINS", "").split(",") if o.strip()
+}
+
+
+class _LoginThrottle:
+    """Counts failed sign-ins and says how long a locked caller must wait.
+
+    Held in memory: a restart clears it, which is acceptable for a single
+    process. The lock covers the threaded development server.
+    """
+
+    def __init__(self):
+        self._failures = {}
+        self._lock = threading.Lock()
+
+    def _recent(self, key, now):
+        times = [t for t in self._failures.get(key, []) if now - t < LOGIN_LOCKOUT_SECONDS]
+        if times:
+            self._failures[key] = times
+        else:
+            self._failures.pop(key, None)
+        return times
+
+    def seconds_locked(self, username, ip):
+        """Seconds until this account or address may try again; 0 if not locked."""
+        now = time.time()
+        with self._lock:
+            wait = 0.0
+            for key, limit in ((("user", username), LOGIN_MAX_ATTEMPTS),
+                               (("ip", ip), LOGIN_IP_MAX_ATTEMPTS)):
+                times = self._recent(key, now)
+                if len(times) >= limit:
+                    wait = max(wait, LOGIN_LOCKOUT_SECONDS - (now - times[-1]))
+            return int(wait) + 1 if wait > 0 else 0
+
+    def record_failure(self, username, ip):
+        now = time.time()
+        with self._lock:
+            if len(self._failures) > 10000:
+                for key in list(self._failures):
+                    self._recent(key, now)
+            for key in (("user", username), ("ip", ip)):
+                self._failures.setdefault(key, []).append(now)
+
+    def reset(self, username):
+        with self._lock:
+            self._failures.pop(("user", username), None)
+
+
+login_throttle = _LoginThrottle()
+
+
+@app.errorhandler(413)
+def request_too_large(_error):
+    """JSON rather than Flask's HTML page, so the upload panel can show it."""
+    limit = int(os.getenv("MAX_UPLOAD_SIZE_MB", "50"))
+    return jsonify({"error": f"File too large. Max: {limit}MB"}), 413
 
 # Thesis scope: fintech industry in Pakistan
 INDUSTRY = "Fintech"
@@ -42,6 +141,9 @@ COUNTRY = "Pakistan"
 # Caps report generation within the LLM's token budget; the UI enforces this
 # too, this is the server-side safety net for direct API calls.
 MAX_STANDARDS_PER_EVALUATION = 10
+
+# Largest page of audit entries one request may ask for.
+MAX_AUDIT_PAGE = 1000
 
 orchestrator = Orchestrator()
 audit = AuditLogger()
@@ -80,8 +182,61 @@ atexit.register(cleanup_session)
 
 
 def _get_client_ip():
-    """Extract client IP from the request, respecting proxy headers."""
-    return request.headers.get("X-Forwarded-For", request.remote_addr) or ""
+    """The address the request came from, as recorded in the audit log.
+
+    X-Forwarded-For is set by the client unless a trusted proxy overwrites
+    it, and nothing sits in front of this app, so trusting it let any caller
+    write an arbitrary address into the audit trail. Behind a real proxy,
+    wrap the app in werkzeug's ProxyFix instead.
+    """
+    return request.remote_addr or ""
+
+
+_UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+@app.before_request
+def reject_cross_site_requests():
+    """Refuse state-changing requests sent from another website.
+
+    Browsers attach Origin (or at least Referer) to these requests, so a page
+    on another site that tries to post to this app is identified and refused.
+    Requests with neither header come from non-browser clients and are not
+    cross-site forgeries.
+    """
+    if request.method not in _UNSAFE_METHODS:
+        return None
+    source = request.headers.get("Origin") or request.headers.get("Referer")
+    if not source:
+        return None
+    parts = urlsplit(source.strip())
+    origin_host = parts.netloc.lower()
+    if origin_host and (
+        origin_host == request.host.lower()
+        or f"{parts.scheme.lower()}://{origin_host}" in TRUSTED_ORIGINS
+    ):
+        return None
+    logger.warning(f"Rejected cross-site {request.method} to {request.path} from {source!r}")
+    return jsonify({"error": "Request rejected: it did not come from this application."}), 403
+
+
+@app.before_request
+def enforce_session_timeout():
+    """End a session that has been idle too long or has run too long."""
+    if not session.get("user_id"):
+        return None
+    now = int(time.time())
+    started = session.get("login_at", now)
+    last_seen = session.get("last_seen", now)
+    if now - last_seen > SESSION_IDLE_SECONDS or now - started > SESSION_MAX_SECONDS:
+        uid = session.get("user_id")
+        session.clear()
+        audit.log(action="LOGOUT", user_id=uid, details={"reason": "session expired"},
+                  ip_address=_get_client_ip())
+        return None
+    session["login_at"] = started
+    session["last_seen"] = now
+    return None
 
 
 @app.after_request
@@ -94,6 +249,13 @@ def add_no_cache_headers(response):
     response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
     response.headers["Pragma"] = "no-cache"
     response.headers["Expires"] = "0"
+    # Basic browser protections: do not guess content types, do not let other
+    # sites frame the app (clickjacking), and do not send this app's addresses
+    # to other sites as the referrer.
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
     return response
 
 
@@ -105,6 +267,50 @@ def login_required(f):
             return jsonify({"error": "Authentication required"}), 401
         return f(*args, **kwargs)
     return wrapper
+
+
+def _public_error(detail, message):
+    """A message safe to show a user, with the detail kept in the server log.
+
+    Provider errors carry library internals and part of the API key (for an
+    invalid key, "Incorrect API key provided: sk-inval****1234"), and those
+    were returned to every user verbatim. The user gets a reference to quote;
+    the log line with the same reference has the full detail.
+    """
+    if not detail:
+        return None
+    reference = uuid.uuid4().hex[:8]
+    logger.error(f"[ref {reference}] {detail}")
+    return f"{message} (reference {reference})"
+
+
+def _error_response(exc, message="Something went wrong. Please try again."):
+    """JSON error for an unexpected failure in a route."""
+    if isinstance(exc, HTTPException):
+        # Raised by Flask itself, e.g. the size limit when a route reads the
+        # upload: already a safe, specific error.
+        if exc.code == 413:
+            return request_too_large(exc)
+        return jsonify({"error": exc.description}), exc.code
+    reference = uuid.uuid4().hex[:8]
+    logger.exception(f"[ref {reference}] {request.method} {request.path} failed")
+    return jsonify({"error": f"{message} (reference {reference})"}), 500
+
+
+def _timestamped_logs(captured) -> list:
+    """Format captured output with the time each line was written.
+
+    One time taken after the request finished used to be applied to every
+    line, so all steps of a long run showed the same second.
+    """
+    return [f"[{started:%H:%M:%S}] {text}" for started, text in captured.timed_lines()]
+
+
+def _is_list_of_names(value, max_length: int = 300) -> bool:
+    """True for a list of non-empty strings of reasonable length."""
+    return isinstance(value, list) and all(
+        isinstance(v, str) and v.strip() and len(v) <= max_length for v in value
+    )
 
 
 def _current_user_id():
@@ -126,9 +332,30 @@ def login():
 
     username = request.form.get("username", "")
     password = request.form.get("password", "")
+    account = (username or "").strip().lower()
+    ip = _get_client_ip()
+
+    # Checked before the password, so a locked account cannot be probed.
+    wait = login_throttle.seconds_locked(account, ip)
+    if wait:
+        audit.log(
+            action="LOGIN",
+            user_id=account or "unknown",
+            status="failure",
+            details={"reason": "locked out"},
+            ip_address=ip,
+        )
+        minutes = -(-wait // 60)
+        unit = "minute" if minutes == 1 else "minutes"
+        return render_template(
+            "login.html",
+            error=f"Too many failed sign-in attempts. Try again in {minutes} {unit}.",
+        ), 429
+
     profile = user_store.verify(username, password)
 
     if not profile:
+        login_throttle.record_failure(account, ip)
         audit.log(
             action="LOGIN",
             user_id=(username or "unknown").strip().lower(),
@@ -140,7 +367,9 @@ def login():
             "login.html", error="Invalid username or password"
         ), 401
 
+    login_throttle.reset(account)
     session.clear()
+    session["login_at"] = session["last_seen"] = int(time.time())
     session["user_id"] = profile["user_id"]
     session["username"] = profile["username"]
     session["name"] = profile["name"]
@@ -179,6 +408,7 @@ def index():
         user_name=session.get("name", ""),
         user_role=session.get("role", ""),
         username=session.get("username", ""),
+        standards_count=len(orchestrator.knowledge_base.list_standards()),
     )
 
 
@@ -186,26 +416,25 @@ def index():
 @login_required
 def chat():
     """Process a chat message through the compliance agent pipeline."""
-    data = request.get_json() or {}
+    # A non-JSON body used to get Flask's HTML error page, and a non-text
+    # message a 500; both are bad input and get a JSON 400.
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
     try:
         user_message = data.get("message", "")
         verbose = data.get("verbose", False)
         user_id = _current_user_id()
 
-        if not user_message.strip():
-            return jsonify({"error": "Empty message"})
+        if not isinstance(user_message, str) or not user_message.strip():
+            return jsonify({"error": "Empty message"}), 400
 
         logs = []
 
         if verbose:
-            captured_output = io.StringIO()
-            with redirect_stdout(captured_output):
+            with capture_output() as captured_output:
                 result = orchestrator.run(user_message, verbose=verbose, user_id=user_id)
-            output_lines = captured_output.getvalue().split("\n")
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            for line in output_lines:
-                if line.strip():
-                    logs.append(f"[{timestamp}] {line.strip()}")
+            logs = _timestamped_logs(captured_output)
         else:
             result = orchestrator.run(user_message, verbose=False, user_id=user_id)
 
@@ -228,7 +457,9 @@ def chat():
             "success": result.success,
             "steps": result.steps_executed,
             "logs": logs,
-            "error": result.error,
+            "error": _public_error(
+                result.error, "Part of this request could not be completed."
+            ),
         })
 
     except Exception as e:
@@ -239,18 +470,37 @@ def chat():
             details={"error": str(e)},
             ip_address=_get_client_ip(),
         )
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
+
+
+# Exchanges redisplayed after a page reload.
+CHAT_HISTORY_LIMIT = 50
+
+
+@app.route("/chat/history", methods=["GET"])
+@login_required
+def chat_history():
+    """The signed-in user's recent chat exchanges, oldest first."""
+    try:
+        history = orchestrator.memory.get_recent_interactions(
+            _current_user_id(), limit=CHAT_HISTORY_LIMIT
+        )
+        return jsonify({"history": history})
+    except Exception as e:
+        return _error_response(e)
 
 
 @app.route("/upload", methods=["POST"])
 @login_required
 def upload_document():
     """Upload a company document (PDF, DOCX, TXT) for compliance analysis."""
+    filename = ""
     try:
         if "file" not in request.files:
             return jsonify({"error": "No file provided"}), 400
 
         file = request.files["file"]
+        filename = file.filename
         user_id = _current_user_id()
 
         if file.filename == "":
@@ -301,9 +551,31 @@ def upload_document():
                 os.remove(tmp_path)
 
     except ValueError as e:
+        # Rejected by validation: contents not matching the extension, too
+        # many pages, and so on. Only the extension check recorded a failure
+        # before, so a file rejected on its contents left no trace in the
+        # audit trail, which is exactly the attempt worth keeping.
+        audit.log(
+            action="DOCUMENT_UPLOAD",
+            user_id=_current_user_id(),
+            resource_type="document",
+            details={"filename": filename, "rejected": str(e)},
+            ip_address=_get_client_ip(),
+            status="failure",
+        )
         return jsonify({"error": str(e)}), 400
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        audit.log(
+            action="DOCUMENT_UPLOAD",
+            user_id=_current_user_id(),
+            resource_type="document",
+            # The cause stays out of the audit trail; _error_response puts it
+            # in the server log behind a reference.
+            details={"filename": filename, "error": "unexpected failure"},
+            ip_address=_get_client_ip(),
+            status="failure",
+        )
+        return _error_response(e)
 
 
 @app.route("/documents", methods=["GET"])
@@ -316,7 +588,7 @@ def list_documents():
         chunk_count = orchestrator.upload_manager.get_user_doc_count(user_id)
         return jsonify({"documents": documents, "total_chunks": chunk_count})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/documents/<doc_id>", methods=["DELETE"])
@@ -341,7 +613,16 @@ def delete_document(doc_id):
         else:
             return jsonify({"error": "Document not found"}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        audit.log(
+            action="DOCUMENT_DELETE",
+            user_id=_current_user_id(),
+            resource_type="document",
+            resource_id=doc_id,
+            details={"error": str(e)},
+            ip_address=_get_client_ip(),
+            status="failure",
+        )
+        return _error_response(e, "The document could not be deleted. Please try again.")
 
 
 # ------------------------------------------------------------------
@@ -352,13 +633,22 @@ def delete_document(doc_id):
 @login_required
 def evaluate_compliance():
     """Run a compliance evaluation against the user's uploaded documents."""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Request body must be a JSON object"}), 400
     try:
         user_id = _current_user_id()
         standards = data.get("standards", None)
         doc_ids = data.get("doc_ids", None) or None
         industry = INDUSTRY
         country = COUNTRY
+
+        # A string was iterated character by character as nine "standards",
+        # and a non-list doc_ids silently matched no documents.
+        if standards is not None and not _is_list_of_names(standards):
+            return jsonify({"error": "standards must be a list of standard names"}), 400
+        if doc_ids is not None and not _is_list_of_names(doc_ids):
+            return jsonify({"error": "doc_ids must be a list of document ids"}), 400
 
         if standards and len(standards) > MAX_STANDARDS_PER_EVALUATION:
             return jsonify({
@@ -367,6 +657,12 @@ def evaluate_compliance():
                     f"Maximum {MAX_STANDARDS_PER_EVALUATION} standards per evaluation."
                 )
             }), 400
+
+        if doc_ids:
+            known = {d["doc_id"] for d in orchestrator.upload_manager.list_documents(user_id)}
+            unknown = [d for d in doc_ids if d not in known]
+            if unknown:
+                return jsonify({"error": f"Unknown document id(s): {', '.join(unknown)}"}), 400
 
         doc_count = orchestrator.upload_manager.get_user_doc_count(user_id)
         if doc_count == 0:
@@ -377,10 +673,8 @@ def evaluate_compliance():
                 )
             }), 200
 
-        logs = []
-        captured_output = io.StringIO()
-        with redirect_stdout(captured_output):
-            report = orchestrator.evaluate_compliance(
+        with capture_output() as captured_output:
+            report, trace_id = orchestrator.evaluate_compliance_traced(
                 user_id=user_id,
                 standards=standards,
                 industry=industry,
@@ -388,23 +682,17 @@ def evaluate_compliance():
                 doc_ids=doc_ids,
                 verbose=True,
             )
-        output_lines = captured_output.getvalue().split("\n")
-        timestamp = datetime.now().strftime("%H:%M:%S")
-        for line in output_lines:
-            if line.strip():
-                logs.append(f"[{timestamp}] {line.strip()}")
+        logs = _timestamped_logs(captured_output)
 
         # Persist the report
-        evaluated_standards = standards or [
-            "ISO 27001", "SOC 2", "GDPR", "NIST CSF", "PCI DSS",
-            "SBP Regulations", "FATF", "SECP Guidelines", "Pakistan AML/CFT",
-        ]
+        evaluated_standards = standards or list(DEFAULT_STANDARDS)
         report_meta = report_store.save_report(
             user_id=user_id,
             report_text=report,
             standards=evaluated_standards,
             industry=industry,
             country=country,
+            trace_id=trace_id,
         )
 
         audit.log(
@@ -416,6 +704,7 @@ def evaluate_compliance():
                 "standards": evaluated_standards,
                 "industry": industry,
                 "country": country,
+                "trace_id": trace_id,
             },
             ip_address=_get_client_ip(),
             status="success",
@@ -424,6 +713,8 @@ def evaluate_compliance():
         return jsonify({
             "report": report,
             "report_id": report_meta.get("report_id"),
+            "timestamp": report_meta.get("timestamp"),
+            "trace_id": trace_id,
             "standards_evaluated": evaluated_standards,
             "industry": industry,
             "country": country,
@@ -438,7 +729,9 @@ def evaluate_compliance():
             details={"error": str(e)},
             ip_address=_get_client_ip(),
         )
-        return jsonify({"error": str(e)}), 500
+        return _error_response(
+            e, "The compliance evaluation could not be completed. Please try again."
+        )
 
 
 # ------------------------------------------------------------------
@@ -454,7 +747,7 @@ def list_reports():
         reports = report_store.list_reports(user_id)
         return jsonify({"reports": reports})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/reports/<report_id>", methods=["GET"])
@@ -468,7 +761,7 @@ def get_report(report_id):
             return jsonify(report)
         return jsonify({"error": "Report not found"}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/reports/<report_id>", methods=["DELETE"])
@@ -492,7 +785,7 @@ def delete_report(report_id):
             return jsonify({"message": f"Report {report_id} deleted"})
         return jsonify({"error": "Report not found"}), 404
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/reports/<report_id>/download", methods=["GET"])
@@ -520,7 +813,7 @@ def download_report(report_id):
             headers={"Content-Disposition": f"attachment; filename=report_{report_id}.md"},
         )
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 # ------------------------------------------------------------------
@@ -531,6 +824,16 @@ def download_report(report_id):
 @login_required
 def audit_logs():
     """Query the current user's audit trail with optional filters."""
+    # A non-number was a 500, and a negative value silently returned nothing.
+    try:
+        limit = int(request.args.get("limit", 100))
+        offset = int(request.args.get("offset", 0))
+    except ValueError:
+        return jsonify({"error": "limit and offset must be whole numbers"}), 400
+    if not 1 <= limit <= MAX_AUDIT_PAGE or offset < 0:
+        return jsonify({
+            "error": f"limit must be between 1 and {MAX_AUDIT_PAGE}, and offset 0 or more"
+        }), 400
     try:
         logs = audit.query(
             user_id=_current_user_id(),
@@ -539,12 +842,12 @@ def audit_logs():
             start_date=request.args.get("start_date"),
             end_date=request.args.get("end_date"),
             status=request.args.get("status"),
-            limit=int(request.args.get("limit", 100)),
-            offset=int(request.args.get("offset", 0)),
+            limit=limit,
+            offset=offset,
         )
         return jsonify({"logs": logs, "count": len(logs)})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/audit/summary", methods=["GET"])
@@ -555,7 +858,7 @@ def audit_summary():
         summary = audit.get_summary(user_id=_current_user_id())
         return jsonify(summary)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/audit/export", methods=["GET"])
@@ -583,7 +886,7 @@ def audit_export():
             headers={"Content-Disposition": "attachment; filename=audit_log.csv"},
         )
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 # ------------------------------------------------------------------
@@ -595,10 +898,10 @@ def audit_export():
 def status():
     """Return system component status."""
     try:
-        status_info = orchestrator.get_system_status()
+        status_info = orchestrator.get_system_status(user_id=_current_user_id())
         return jsonify(status_info)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/knowledge/status")
@@ -609,7 +912,7 @@ def knowledge_status():
         kb_status = orchestrator.knowledge_base.get_status()
         return jsonify(kb_status)
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/knowledge/standards")
@@ -620,7 +923,7 @@ def knowledge_standards():
         standards = orchestrator.knowledge_base.list_standards()
         return jsonify({"standards": standards})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/knowledge/standards/<filename>/download")
@@ -655,7 +958,7 @@ def download_knowledge_standard(filename):
             headers={"Content-Disposition": f"attachment; filename={filename}"},
         )
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 @app.route("/reset", methods=["POST"])
@@ -674,7 +977,7 @@ def reset():
 
         return jsonify({"message": "Session reset successfully"})
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return _error_response(e)
 
 
 if __name__ == "__main__":

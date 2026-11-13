@@ -42,15 +42,15 @@ Applies specifically to electronic PHI (ePHI) and requires:
 - Transmission security (integrity controls and encryption)
 
 ### Breach Notification Rule
-- Covered entities must notify affected individuals within 60 days of discovering a breach
+- Covered entities must notify affected individuals without unreasonable delay and in no case later than 60 calendar days after discovery of a breach (45 CFR 164.404)
 - Must notify HHS (Department of Health and Human Services)
-- If breach affects 500+ individuals, must notify prominent media outlets
+- If a breach of unsecured PHI involves more than 500 residents of a State or jurisdiction, must notify prominent media outlets serving that State or jurisdiction (45 CFR 164.406)
 - Business associates must notify covered entities of breaches
 
 ### Enforcement Rule
-- HHS Office for Civil Rights (OCR) enforces HIPAA
-- Investigations may result from complaints or compliance reviews
-- Resolution may include voluntary compliance, corrective action plans, or civil money penalties
+- The Secretary of Health and Human Services enforces the rules (45 CFR Part 160, Subparts C and D)
+- Investigations may result from complaints to the Secretary or from compliance reviews (45 CFR 160.306, 160.308)
+- Matters may be resolved by informal means, or the Secretary may impose civil money penalties (45 CFR 160.312, Subpart D)
 
 ## Minimum Necessary Standard
 - Covered entities must make reasonable efforts to limit PHI use, disclosure, and requests to the minimum necessary to accomplish the intended purpose
@@ -63,8 +63,10 @@ Applies specifically to electronic PHI (ePHI) and requires:
 - Must require breach reporting
 
 ## Penalties
-- **Tier 1 (Lack of Knowledge)**: $100 – $50,000 per violation, up to $25,000/year
-- **Tier 2 (Reasonable Cause)**: $1,000 – $50,000 per violation, up to $100,000/year
-- **Tier 3 (Willful Neglect — Corrected)**: $10,000 – $50,000 per violation, up to $250,000/year
-- **Tier 4 (Willful Neglect — Not Corrected)**: $50,000 per violation, up to $1.5 million/year
-- Criminal penalties: up to 10 years imprisonment for intentional violations
+Civil money penalties for violations on or after 18 February 2009 (45 CFR 160.404(b)(2)), before inflation adjustment:
+- **Did not know (and would not have known with reasonable diligence)**: $100 – $50,000 per violation
+- **Reasonable cause, not willful neglect**: $1,000 – $50,000 per violation
+- **Willful neglect, corrected within 30 days**: $10,000 – $50,000 per violation
+- **Willful neglect, not corrected within 30 days**: at least $50,000 per violation
+- In each tier, penalties for identical violations may not exceed $1,500,000 in a calendar year
+- These amounts are adjusted for inflation annually and published at 45 CFR part 102
