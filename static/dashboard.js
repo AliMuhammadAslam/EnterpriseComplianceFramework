@@ -65,6 +65,19 @@
         const d = new Date(ts);
         return isNaN(d) ? "?" : d.toLocaleDateString(undefined, { day: "numeric", month: "short" });
     }
+    // Axis labels for a list of reports: the date, plus the time when another
+    // report in the list falls on the same day.
+    // With timeOnly, a same-day label shows just the time, for narrow slots.
+    function axisLabels(list, timeOnly) {
+        const days = list.map(r => shortDate(r.timestamp));
+        return list.map((r, i) => {
+            if (days.filter(d => d === days[i]).length < 2) return days[i];
+            const d = new Date(r.timestamp);
+            if (isNaN(d)) return days[i];
+            const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+            return timeOnly ? time : `${days[i]}, ${time}`;
+        });
+    }
     function truncate(text, max) {
         return text.length > max ? text.slice(0, max - 1) + "…" : text;
     }
@@ -394,7 +407,9 @@
         const max = niceMax(Math.max(1, ...values));
         const s = svg("svg", { class: "dv-chart", viewBox: `0 0 ${w} ${h}`, role: "group", "aria-label": metric === "gaps" ? "Gaps per evaluation" : "Total risk score per evaluation" });
         const plotW = w - left - right, plotH = h - top - bottom;
-        const x = i => list.length === 1 ? left + plotW / 2 : left + i * plotW / (list.length - 1);
+        const inset = 16;
+        const x = i => list.length === 1 ? left + plotW / 2 : left + inset + i * (plotW - 2 * inset) / (list.length - 1);
+        const labels = axisLabels(list);
         const y = v => top + plotH - v / max * plotH;
         ticks(max).forEach(t => {
             s.appendChild(svg("line", { class: "dv-gridline", x1: left, x2: w - right, y1: y(t), y2: y(t) }));
@@ -413,7 +428,8 @@
             s.appendChild(svg("path", { d: `${line} L${pts[pts.length - 1][0]},${y(0)} L${pts[0][0]},${y(0)} Z`, fill: `url(#${gradId})` }));
             s.appendChild(svg("path", { d: line, fill: "none", stroke: color, "stroke-width": 2.5, "stroke-linecap": "round" }));
         }
-        const labelEvery = Math.max(1, Math.ceil(list.length / Math.max(1, Math.floor(plotW / 64))));
+        const labelW = Math.max(...labels.map(l => l.length)) * 6.5 + 10;  // approx. width at 11px
+        const labelEvery = Math.max(1, Math.ceil(list.length / Math.max(1, Math.floor(plotW / labelW))));
         const cross = svg("line", { class: "dv-baseline", x1: 0, x2: 0, y1: top, y2: top + plotH, opacity: 0, "stroke-dasharray": "3 3" });
         s.appendChild(cross);
         list.forEach((r, i) => {
@@ -426,9 +442,13 @@
                 s.appendChild(svg("text", { class: "dv-axis-text", x: px, y: py - 10, "text-anchor": "middle", "font-weight": "700", text: txt }));
             }
             if (i % labelEvery === 0 || i === list.length - 1) {
-                s.appendChild(svg("text", { class: "dv-axis-text", x: px, y: h - 10, "text-anchor": "middle", text: shortDate(r.timestamp) }));
+                // Keep the label inside the chart: anchor it to an edge when centring would clip it.
+                const half = labels[i].length * 3.25;
+                const anchor = px + half > w - 2 ? "end" : px - half < 2 ? "start" : "middle";
+                const lx = anchor === "end" ? w - 2 : anchor === "start" ? 2 : px;
+                s.appendChild(svg("text", { class: "dv-axis-text", x: lx, y: h - 10, "text-anchor": anchor, text: labels[i] }));
             }
-            const slotW = list.length === 1 ? plotW : plotW / (list.length - 1);
+            const slotW = list.length === 1 ? plotW : (plotW - 2 * inset) / (list.length - 1);
             const hit = svg("rect", { class: "dv-hit dv-clickable", x: px - slotW / 2, y: top, width: slotW, height: plotH });
             const tipLines = [fmtDate(r.timestamp, true), [metric === "gaps" ? "Gaps" : "Total risk score", values[i]]];
             if (i > 0) tipLines.push(["Change vs previous", (values[i] - values[i - 1] > 0 ? "+" : "") + (values[i] - values[i - 1])]);
@@ -459,6 +479,9 @@
             s.appendChild(svg("text", { class: "dv-axis-text", x: left - 6, y: y + 4, "text-anchor": "end", text: String(t) }));
         });
         const slot = plotW / Math.max(1, list.length), bw = Math.min(38, slot * 0.6);
+        const full = axisLabels(list);
+        const fits = Math.max(...full.map(l => l.length)) * 6.5 + 8 <= slot;
+        const labels = fits ? full : axisLabels(list, true);
         list.forEach((r, i) => {
             const x = left + slot * i + (slot - bw) / 2;
             let yCursor = top + plotH;
@@ -473,7 +496,7 @@
                 if (segH >= 16) s.appendChild(svg("text", { x: x + bw / 2, y: y + segH / 2 + 4, "text-anchor": "middle", "font-size": "11", "font-weight": "700", fill: inkOn(fill), "pointer-events": "none", text: String(n) }));
                 yCursor = y;
             });
-            s.appendChild(svg("text", { class: "dv-axis-text", x: x + bw / 2, y: h - 10, "text-anchor": "middle", text: shortDate(r.timestamp) }));
+            s.appendChild(svg("text", { class: "dv-axis-text", x: x + bw / 2, y: h - 10, "text-anchor": "middle", text: labels[i] }));
         });
         s.appendChild(svg("line", { class: "dv-baseline", x1: left, x2: w - right, y1: top + plotH, y2: top + plotH }));
         return s;
@@ -552,14 +575,22 @@
             list.slice().reverse().map((x, i) => el("option", { value: x.report_id, text: `${fmtDate(x.timestamp, true)}${i === 0 ? " (latest)" : ""}` })));
         select.value = r.report_id;
         select.addEventListener("change", () => { state.selectedId = select.value; render(); });
-        const refresh = el("button", { class: "dv-btn", type: "button", onclick: () => load() }, [icon("refresh"), el("span", { text: "Refresh" })]);
+        const busy = state.loading;
+        const refresh = el("button", { class: "dv-btn", type: "button", onclick: () => load() },
+            [icon("refresh"), el("span", { text: busy ? "Refreshing…" : "Refresh" })]);
         refresh.querySelector("svg").setAttribute("class", "icon");
+        if (busy) { refresh.disabled = true; refresh.setAttribute("aria-busy", "true"); }
+        const status = state.refreshError
+            ? el("span", { class: "dv-status dv-status-error", role: "alert", text: `Refresh failed: ${state.refreshError}` })
+            : state.loadedAt
+                ? el("span", { class: "dv-status", role: "status", text: `Updated ${state.loadedAt.toLocaleTimeString()}` })
+                : null;
         return el("div", { class: "dv-header" }, [
             el("div", {}, [
                 el("h2", { class: "dv-title" }, [document.createTextNode("Compliance "), el("span", { text: "Dashboard" })]),
                 el("div", { class: "dv-subtitle", text: "Figures are read from the tables in your saved evaluation reports." }),
             ]),
-            el("div", { class: "dv-controls" }, [el("label", { for: "dvReportSelect", text: "Evaluation" }), select, refresh]),
+            el("div", { class: "dv-controls" }, [status, el("label", { for: "dvReportSelect", text: "Evaluation" }), select, refresh]),
         ]);
     }
 
@@ -649,16 +680,22 @@
     }
 
     async function load() {
+        if (state.loading) return;
         state.loading = true;
         state.error = null;
-        if (!state.data) render();
+        state.refreshError = null;
+        render();
         try {
             const res = await fetch("/dashboard/data");
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || "Could not load the dashboard.");
             state.data = data;
+            state.loadedAt = new Date();
         } catch (e) {
-            state.error = e.message || "Could not load the dashboard.";
+            // With figures already on screen, keep them and report the failure.
+            const message = e.message || "Could not load the dashboard.";
+            if (state.data) state.refreshError = message;
+            else state.error = message;
         } finally {
             state.loading = false;
             render();
