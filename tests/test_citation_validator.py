@@ -433,10 +433,9 @@ class TestWholeIdentifierMatching(unittest.TestCase):
 
 
 class TestPromptsForbidRetrievalLabels(unittest.TestCase):
-    """Answers cited "(Chunk 2)", a retrieval label that means nothing to a reader.
+    """Prompts that write user-facing text forbid citing retrieval labels.
 
-    The label stays in the context because the validator parses it, so every
-    prompt that writes user-facing text must tell the model not to cite it.
+    The "Chunk N" labels stay in the context because the validator parses them.
     """
 
     RULE = "retrieval labels, not part of any document. Never cite them"

@@ -167,8 +167,8 @@ class AuditLogger:
             stored = record.get("entry_hash")
             if not stored:
                 # Legacy entries can only precede the chain. One without hash
-                # fields after it began has had them stripped, which otherwise
-                # let the final entry be edited without detection.
+                # fields after it began has had them stripped; accepting it
+                # would let the final entry be edited without detection.
                 if chain_started:
                     problems.append({
                         "position": position,
@@ -267,7 +267,7 @@ class AuditLogger:
 
     def export_csv(self, filepath: str, **filters) -> str:
         """Export filtered audit entries to a CSV file and return the path."""
-        # Every matching entry: a fixed cap silently truncated the export.
+        # Every matching entry: a fixed cap would truncate the export.
         entries = self.query(**filters, limit=sys.maxsize)
         if not entries:
             return filepath

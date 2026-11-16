@@ -138,9 +138,9 @@ def _words(n):
 class TestNoRedundantTailChunk(unittest.TestCase):
     """The last chunk must add words the previous one did not already hold.
 
-    The split loop used to step back by the overlap even after reaching the
-    end, so 950 words at size 500 / overlap 50 gave a third chunk, words
-    900-950, that sat entirely inside the second.
+    Stepping back by the overlap after reaching the end would give 950 words
+    at size 500 / overlap 50 a third chunk, words 900-950, lying entirely
+    inside the second.
     """
 
     def split(self, n):

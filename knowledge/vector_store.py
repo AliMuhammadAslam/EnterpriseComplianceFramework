@@ -50,7 +50,7 @@ class VectorStore:
 
         Upsert rather than add: chunk ids are derived from the filename and
         position, so a re-ingest reuses them. add() ignores ids that already
-        exist, which silently kept stale text and metadata in the store.
+        exist, which would keep stale text and metadata in the store.
         """
         collection = self._get_or_create_collection(collection_name)
         embeddings = self.embedding_service.embed_batch(documents)
@@ -249,8 +249,8 @@ class VectorStore:
     def delete_company_document(self, user_id: str, doc_id: str):
         """Delete a single document's chunks from a user's collection by doc_id.
 
-        Raises on failure. Swallowing the error let the caller report the
-        document deleted while its chunks stayed searchable.
+        Raises on failure, so the caller never reports the document deleted
+        while its chunks are still searchable.
         """
         collection_name = f"company_docs_{user_id}"
         try:

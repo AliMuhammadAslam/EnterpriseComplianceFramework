@@ -20,6 +20,7 @@ from agent.orchestrator import Orchestrator
 from audit.audit_logger import AuditLogger
 from evaluation.report_store import ReportStore
 from evaluation.engine import DEFAULT_STANDARDS
+from evaluation.dashboard import build_dashboard
 from auth.user_store import UserStore
 from utils.output_capture import capture_output
 from utils.logger import logger_instance
@@ -43,8 +44,8 @@ app.config.update(
     # over HTTPS, or the cookie can travel unencrypted.
     SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "false").strip().lower() == "true",
     # Reject an oversized request before it is read. Without a cap, a body of
-    # any size was received and written to disk before the upload size check
-    # ran. One extra MB allows for the multipart encoding around the file.
+    # any size would be received and written to disk before the upload size
+    # check runs. One extra MB allows for the multipart encoding around the file.
     MAX_CONTENT_LENGTH=(int(os.getenv("MAX_UPLOAD_SIZE_MB", "50")) + 1) * 1024 * 1024,
 )
 
@@ -185,8 +186,8 @@ def _get_client_ip():
     """The address the request came from, as recorded in the audit log.
 
     X-Forwarded-For is set by the client unless a trusted proxy overwrites
-    it, and nothing sits in front of this app, so trusting it let any caller
-    write an arbitrary address into the audit trail. Behind a real proxy,
+    it, and nothing sits in front of this app, so trusting it would let any
+    caller write an arbitrary address into the audit trail. Behind a real proxy,
     wrap the app in werkzeug's ProxyFix instead.
     """
     return request.remote_addr or ""
@@ -273,9 +274,9 @@ def _public_error(detail, message):
     """A message safe to show a user, with the detail kept in the server log.
 
     Provider errors carry library internals and part of the API key (for an
-    invalid key, "Incorrect API key provided: sk-inval****1234"), and those
-    were returned to every user verbatim. The user gets a reference to quote;
-    the log line with the same reference has the full detail.
+    invalid key, "Incorrect API key provided: sk-inval****1234"), so they are
+    never shown to users. The user gets a reference to quote; the log line
+    with the same reference has the full detail.
     """
     if not detail:
         return None
@@ -298,11 +299,7 @@ def _error_response(exc, message="Something went wrong. Please try again."):
 
 
 def _timestamped_logs(captured) -> list:
-    """Format captured output with the time each line was written.
-
-    One time taken after the request finished used to be applied to every
-    line, so all steps of a long run showed the same second.
-    """
+    """Format captured output with the time each line was written."""
     return [f"[{started:%H:%M:%S}] {text}" for started, text in captured.timed_lines()]
 
 
@@ -416,8 +413,7 @@ def index():
 @login_required
 def chat():
     """Process a chat message through the compliance agent pipeline."""
-    # A non-JSON body used to get Flask's HTML error page, and a non-text
-    # message a 500; both are bad input and get a JSON 400.
+    # A non-JSON body or a non-text message is bad input and gets a JSON 400.
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "Request body must be a JSON object"}), 400
@@ -643,8 +639,8 @@ def evaluate_compliance():
         industry = INDUSTRY
         country = COUNTRY
 
-        # A string was iterated character by character as nine "standards",
-        # and a non-list doc_ids silently matched no documents.
+        # A string would be iterated character by character as separate
+        # "standards", and a non-list doc_ids would match no documents.
         if standards is not None and not _is_list_of_names(standards):
             return jsonify({"error": "standards must be a list of standard names"}), 400
         if doc_ids is not None and not _is_list_of_names(doc_ids):
@@ -750,6 +746,19 @@ def list_reports():
         return _error_response(e)
 
 
+@app.route("/dashboard/data", methods=["GET"])
+@login_required
+def dashboard_data():
+    """Dashboard figures from the current user's saved reports."""
+    try:
+        user_id = _current_user_id()
+        records = [report_store.get_report(user_id, r["report_id"])
+                   for r in report_store.list_reports(user_id)]
+        return jsonify(build_dashboard([r for r in records if r]))
+    except Exception as e:
+        return _error_response(e)
+
+
 @app.route("/reports/<report_id>", methods=["GET"])
 @login_required
 def get_report(report_id):
@@ -824,7 +833,7 @@ def download_report(report_id):
 @login_required
 def audit_logs():
     """Query the current user's audit trail with optional filters."""
-    # A non-number was a 500, and a negative value silently returned nothing.
+    # Non-numbers and negative values are bad input and get a 400.
     try:
         limit = int(request.args.get("limit", 100))
         offset = int(request.args.get("offset", 0))

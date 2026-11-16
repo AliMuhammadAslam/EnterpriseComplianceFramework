@@ -339,5 +339,35 @@ class TestSecurityHeaders(_WebAppCase):
         self.assertEqual(r.headers.get("Referrer-Policy"), "same-origin")
 
 
+
+class TestDashboardData(_WebAppCase):
+
+    REPORT = (
+        "## Standards Coverage\n\n| Standard | Status | Note |\n|---|---|---|\n"
+        "| GDPR | Documentation gap | none |\n\n"
+        "## Regulatory Risk Score and Prioritization\n\n"
+        "| Gap | Standard | S | L | G | Risk Score | Priority Band |\n|---|---|---|---|---|---|---|\n"
+        "| Breach notice | GDPR | 5 | 2 | 3 | 30 | Immediate |\n"
+    )
+
+    def test_shows_only_this_users_reports(self):
+        store = self.web_app.report_store
+        mine = store.save_report("default", self.REPORT, ["GDPR"])
+        theirs = store.save_report("someone_else", self.REPORT, ["GDPR"])
+        self.addCleanup(store.delete_report, "default", mine["report_id"])
+        self.addCleanup(store.delete_report, "someone_else", theirs["report_id"])
+
+        data = self.client.get("/dashboard/data").get_json()
+        ids = [r["report_id"] for r in data["reports"]]
+        self.assertIn(mine["report_id"], ids)
+        self.assertNotIn(theirs["report_id"], ids)
+        report = next(r for r in data["reports"] if r["report_id"] == mine["report_id"])
+        self.assertEqual(report["gaps"][0]["score"], 30)
+        self.assertEqual(report["coverage"], [{"standard": "GDPR", "status": "Documentation gap"}])
+
+    def test_needs_a_session(self):
+        self.assertEqual(self.web_app.app.test_client().get("/dashboard/data").status_code, 401)
+
+
 if __name__ == "__main__":
     unittest.main()

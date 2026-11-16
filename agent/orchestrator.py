@@ -345,8 +345,8 @@ class Orchestrator:
     def reset_session(self, user_id: str = "default"):
         """Clear a user's conversation memory.
 
-        Only this user's history is touched. Ending the shared session here
-        used to close every other user's in-progress session as a side effect.
+        Only this user's history is touched; other users' sessions are left
+        running.
         """
         self.memory.clear_user_conversation(user_id)
         self.logger.info(f"Session reset for user: {user_id}")

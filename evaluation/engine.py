@@ -363,8 +363,8 @@ CRITICAL RULES:
 
 Produce a detailed, structured compliance evaluation report. In the Standards Coverage section, list every one of the standards above exactly once with its status of Findings, Documentation gap, or Not applicable, so that no standard is silently omitted. Do not create empty Compliant Areas or Gap Analysis subsections for standards that are Not applicable. Cite specific clause/article/section numbers for every finding. In the Regulatory Risk Score and Prioritization section, include the scoring table with the S, L and G values shown for every gap."""
 
-        # Raise on failure. Returning an error page as report text used to get
-        # it validated, saved as a report and audited as a successful run.
+        # Raise on failure, so an error page is never validated, saved as a
+        # report or audited as a successful run.
         try:
             response = completion(
                 model=self.model_config["model"],

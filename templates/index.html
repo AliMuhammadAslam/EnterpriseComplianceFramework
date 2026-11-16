@@ -357,6 +357,12 @@
         .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
 
         .eval-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+        .eval-company-note {
+            font-size: 0.74rem; line-height: 1.45; color: #fde68a;
+            background: rgba(245, 158, 11, 0.12); border-left: 3px solid var(--warning);
+            border-radius: 6px; padding: 0.5rem 0.6rem; margin-bottom: 0.6rem;
+        }
+        .eval-company-note[hidden] { display: none; }
 
         /* Audit log panel */
         .audit-log-list { max-height: 200px; overflow-y: auto; }
@@ -1319,6 +1325,7 @@
             }
         }
     </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
 </head>
 <body>
     <!-- Line icons (Feather, MIT licence), used as <svg><use href="#i-name"/></svg> -->
@@ -1404,6 +1411,7 @@
                                 <span id="standardsCounter" style="font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text-muted);"></span>
                             </label>
                             <div class="standards-grid" id="standardsGrid"></div>
+                            <div class="eval-company-note" id="evalCompanyNote" role="note" hidden></div>
                             <button class="btn-success" onclick="runEvaluation()" id="evalButton">
                                 Run Compliance Evaluation
                             </button>
@@ -1495,6 +1503,10 @@
                 <div class="top-bar-left">
                     <button class="menu-btn" onclick="toggleSidebar()" aria-label="Open menu"><svg class="icon" aria-hidden="true"><use href="#i-menu"/></svg></button>
                     <h2>Compliance Assistant</h2>
+                    <div class="view-tabs" role="tablist" aria-label="View">
+                        <button class="view-tab" role="tab" id="tabChat" aria-selected="true" aria-controls="chatView" onclick="showView('chat')" onkeydown="handleViewTabKey(event)">Chat</button>
+                        <button class="view-tab" role="tab" id="tabDashboard" aria-selected="false" aria-controls="dashboardView" tabindex="-1" onclick="showView('dashboard')" onkeydown="handleViewTabKey(event)"><svg class="icon" aria-hidden="true"><use href="#i-chart"/></svg>Dashboard</button>
+                    </div>
                 </div>
                 <div class="top-bar-right">
                     <div class="health-pill">
@@ -1511,7 +1523,7 @@
                 </div>
             </div>
 
-            <div class="chat-container">
+            <div class="chat-container" id="chatView" role="tabpanel" aria-labelledby="tabChat">
                 <div class="chat-messages" id="chatMessages" role="log" aria-live="polite" aria-label="Conversation">
                 </div>
 
@@ -1529,6 +1541,8 @@
                     </div>
                 </div>
             </div>
+
+            <div class="dashboard-view" id="dashboardView" role="tabpanel" aria-labelledby="tabDashboard" hidden></div>
 
             <!-- Logs Bar -->
             <div class="logs-bar collapsed" id="logsBar">
@@ -1577,6 +1591,7 @@
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer" role="status" aria-live="polite"></div>
 
+    <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
     <script>
         // ------------------------------------------------------------------
         // State
@@ -1628,7 +1643,32 @@
             setupDragDrop();
             loadStandardsGrid();
             loadModelName();
+            window.Dashboard?.init(document.getElementById('dashboardView'));
         });
+
+        // ------------------------------------------------------------------
+        // Chat / Dashboard views
+        // ------------------------------------------------------------------
+        function showView(view) {
+            const dashboard = view === 'dashboard';
+            document.getElementById('chatView').hidden = dashboard;
+            document.getElementById('logsBar').hidden = dashboard;
+            document.getElementById('dashboardView').hidden = !dashboard;
+            const tabs = { chat: document.getElementById('tabChat'), dashboard: document.getElementById('tabDashboard') };
+            for (const [name, tab] of Object.entries(tabs)) {
+                tab.setAttribute('aria-selected', String(name === view));
+                tab.tabIndex = name === view ? 0 : -1;
+            }
+            if (dashboard) window.Dashboard?.show();
+        }
+
+        function handleViewTabKey(event) {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault();
+            const next = event.currentTarget.id === 'tabChat' ? 'dashboard' : 'chat';
+            showView(next);
+            document.getElementById(next === 'chat' ? 'tabChat' : 'tabDashboard').focus();
+        }
 
         // If the browser restores this page from its back-forward cache after a
         // logout, reload so the server can send the user back to the login page.
@@ -1917,6 +1957,7 @@
                 const data = await res.json();
                 const list = document.getElementById('docList');
                 const healthDocs = document.getElementById('healthDocs');
+                const ticked = new Set(getSelectedDocIds());
                 list.innerHTML = '';
                 const docs = data.documents || [];
                 healthDocs.textContent = docs.length;
@@ -1924,8 +1965,8 @@
                     const div = document.createElement('div');
                     div.className = 'doc-item';
                     div.innerHTML = `
-                        <input type="checkbox" class="doc-select-checkbox" data-doc-id="${doc.doc_id}" checked
-                            title="Include this document in the next evaluation">
+                        <input type="checkbox" class="doc-select-checkbox" data-doc-id="${doc.doc_id}" ${ticked.has(doc.doc_id) ? 'checked' : ''}
+                            title="Include this document in the next evaluation" onchange="updateEvalButtonState()">
                         <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
                         <span class="doc-meta">${doc.chunk_count} chunks</span>
                         <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete" aria-label="Delete ${doc.original_filename}">${iconSvg('x')}</button>`;
@@ -1942,8 +1983,17 @@
         function updateEvalButtonState() {
             if (_evalInFlight) return;
             const hasDocs = getTotalDocCount() > 0;
-            document.getElementById('evalButton').disabled = !hasDocs;
-            document.getElementById('evalHint').style.display = hasDocs ? 'none' : 'block';
+            const ticked = getSelectedDocIds().length;
+            const hint = document.getElementById('evalHint');
+            document.getElementById('evalButton').disabled = ticked === 0;
+            hint.style.display = ticked === 0 ? 'block' : 'none';
+            hint.textContent = hasDocs
+                ? "Tick one company's documents in Company Documents to run an evaluation."
+                : 'Upload a company document to run an evaluation.';
+            // Ticked documents are assessed together as one company's evidence.
+            const note = document.getElementById('evalCompanyNote');
+            note.hidden = ticked < 2;
+            note.textContent = `⚠ ${ticked} documents are ticked and will be evaluated together as one company. Tick only one company's documents.`;
         }
 
         function uploadFile(input) { if (input.files.length > 0) uploadFiles(input.files); }
@@ -2138,6 +2188,7 @@
                     }
                     showToast(`Evaluation complete - Report ID: ${data.report_id}`, 'success');
                     loadReports();
+                    window.Dashboard?.refresh();
                     if (data.logs) displayLogs(data.logs);
                 }
                 loadAuditLogs();
@@ -2329,6 +2380,7 @@
                             // If the deleted report is open in the modal, close it
                             if (_currentModalReportId === reportId) closeReportModal();
                             loadReports();
+                            window.Dashboard?.refresh();
                             loadAuditLogs();
                             showToast('Report deleted', 'info');
                         } else {
@@ -2655,8 +2707,8 @@
             // Blockquote
             html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
 
-            // Lists, including indented sub-lists: an indented bullet used to
-            // fall out of the list and keep its "- " as text. A single blank
+            // Lists, including indented sub-lists, so an indented bullet stays
+            // in its list rather than showing its "- " as text. A single blank
             // line between items keeps one list together.
             {
                 const sourceLines = html.split('\n');
@@ -2711,8 +2763,8 @@
 
             // Paragraphs. Block elements go on lines of their own; the other
             // lines are grouped into paragraphs, split at blank lines. Turning
-            // every newline into <br> used to leave line breaks after headings,
-            // tables and lists, and unmatched <p> tags, which showed as gaps.
+            // every newline into <br> would leave line breaks after headings,
+            // tables and lists, and unmatched <p> tags, which show as gaps.
             const BLOCK_TAGS = 'h1|h2|h3|h4|ul|ol|table|blockquote|div';
             html = html
                 .replace(new RegExp(`(</(?:${BLOCK_TAGS})>|<hr>)`, 'g'), '$1\n')
@@ -2888,8 +2940,8 @@
         // Typing Indicator
         // ------------------------------------------------------------------
         // Chat and evaluation share the indicator, so it counts open requests:
-        // a chat reply arriving during an evaluation used to hide it while the
-        // evaluation was still running.
+        // a chat reply arriving during an evaluation must not hide it while
+        // the evaluation is still running.
         let _typingCount = 0;
 
         // Shows the indicator for one request; the returned function hides it

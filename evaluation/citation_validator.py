@@ -35,9 +35,9 @@ TRUST_USER_SUPPLIED = "user_supplied"
 CITATION_PATTERNS: List[Tuple[str, str]] = [
     ("iso_control", r"\bA\.\d+\.\d+\b"),
     ("requirement", r"\bRequirement\s+\d+(?:\.\d+)*\b"),
-    # (?!\w) rather than \b: a trailing \b cannot match across
-    # ")", so the optional sub-clause was dropped and "Article 17(3)" became
-    # "Article 17", letting a subsection absent from the corpus count as found.
+    # (?!\w) rather than \b: a trailing \b cannot match after ")", which
+    # would drop the optional sub-clause and read "Article 17(3)" as
+    # "Article 17", counting a subsection absent from the corpus as found.
     ("article", r"\bArticle\s+\d+(?:\(\d+\))?(?!\w)"),
     ("section", r"\bSection\s+\d+(?:\(\d+\))?(?!\w)"),
     ("clause", r"\bClause\s+\d+(?:\.\d+)*\b"),
@@ -171,8 +171,8 @@ def _normalise(value: str) -> str:
 def _find_identifier(haystack: str, needle: str) -> int:
     """Position of a whole identifier in normalised text, or -1.
 
-    A plain substring search let "article 1" match inside "article 17", and
-    "a.5.1" inside "a.5.10", so an identifier absent from the corpus counted
+    A plain substring search would let "article 1" match inside "article 17",
+    and "a.5.1" inside "a.5.10", counting an identifier absent from the corpus
     as supported. The match must not run on into further digits, or start in
     the middle of a word. A parent of a cited sub-part still matches, so
     "article 17" is found in "article 17(3)" and "requirement 3" in
@@ -388,8 +388,7 @@ def format_report(report: ValidationReport) -> str:
         lines.append("")
 
     if report.total == 0:
-        # Stated as a verdict: a bare "nothing to check" read as a pass, when it
-        # means no finding in the report was verified against the corpus.
+        # Nothing cited means nothing was verified, so state that plainly.
         lines.append(
             "**Not verified.** No regulatory identifiers were cited (article, "
             "section, clause, control or requirement numbers, or PKR amounts), "

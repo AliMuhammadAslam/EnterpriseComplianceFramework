@@ -96,9 +96,8 @@ class UploadManager:
         stored_path = os.path.join(user_dir, stored_filename)
 
         # Chunks, stored file and manifest entry succeed together or not at
-        # all. A failure after the chunks were stored used to leave them
-        # searchable but missing from the document list, so they could never
-        # be deleted.
+        # all, so chunks are never left searchable without a document-list
+        # entry through which they can be deleted.
         try:
             self.vector_store.add_company_documents(
                 user_id=user_id,
@@ -190,7 +189,7 @@ class UploadManager:
         ]
         self._save_manifest(user_id, manifest)
 
-        # Safety net for any pre-existing orphaned chunks from before this fix
+        # Remove any orphaned chunks left in a collection with no documents
         if not manifest["documents"]:
             self.vector_store.delete_company_collection(user_id)
 
