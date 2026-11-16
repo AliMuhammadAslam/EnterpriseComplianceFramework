@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from pydantic import BaseModel, field_validator
 from litellm import completion
 from dotenv import load_dotenv
@@ -8,6 +9,15 @@ from utils.logger import logger_instance
 from utils import run_config
 
 load_dotenv()
+
+
+def _max_plan_steps() -> int:
+    """Upper limit on plan steps, from MAX_PLAN_STEPS (default 6)."""
+    try:
+        value = int(os.getenv("MAX_PLAN_STEPS", "6"))
+    except ValueError:
+        return 6
+    return value if value > 0 else 6
 
 
 class PlanStep(BaseModel):
@@ -24,6 +34,29 @@ class PlanStep(BaseModel):
         if isinstance(v, str) and v.strip().lower() in ("null", "none", ""):
             return None
         return v
+
+    @field_validator("dependencies", mode="before")
+    @classmethod
+    def normalise_dependencies(cls, v):
+        """Accept step numbers written as text, e.g. "2" or "step_number: 2".
+
+        Entries without a number are skipped rather than rejecting the plan.
+        """
+        if not isinstance(v, list):
+            return []
+        numbers = []
+        for item in v:
+            if isinstance(item, bool):
+                continue
+            if isinstance(item, int):
+                numbers.append(item)
+            elif isinstance(item, float) and item.is_integer():
+                numbers.append(int(item))
+            elif isinstance(item, str):
+                match = re.search(r"\d+", item)
+                if match:
+                    numbers.append(int(match.group()))
+        return numbers
 
 
 class Plan(BaseModel):
@@ -128,6 +161,10 @@ Every step must use LLM reasoning only (tool_required: null)."""
                 temperature=self.model_config["temperature"],
                 max_tokens=self.model_config["max_tokens"],
                 seed=run_config.seed(),
+                # Request a JSON object; the fallback below handles other failures.
+                # drop_params omits the setting for models without JSON mode.
+                response_format={"type": "json_object"},
+                drop_params=True,
             )
 
             raw_content = response.choices[0].message.content.strip()
@@ -137,6 +174,18 @@ Every step must use LLM reasoning only (tool_required: null)."""
                 raw_content = raw_content.rsplit("```", 1)[0]
 
             plan = Plan(**json.loads(raw_content.strip()))
+            # Cap the plan length: each step is a separate model call.
+            limit = _max_plan_steps()
+            if len(plan.steps) > limit:
+                self.logger.warning(
+                    f"Plan had {len(plan.steps)} steps; keeping the first {limit}"
+                )
+                plan.steps = plan.steps[:limit]
+            # A dependency on a step that is not in the plan would stop the
+            # dependent step from running.
+            kept = {s.step_number for s in plan.steps}
+            for s in plan.steps:
+                s.dependencies = [d for d in s.dependencies if d in kept]
             self.logger.info(f"Created plan with {len(plan.steps)} steps")
             return plan
 

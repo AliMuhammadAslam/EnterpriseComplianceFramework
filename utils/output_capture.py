@@ -40,10 +40,9 @@ class _ThreadRoutedStream:
 class _TimedBuffer(io.StringIO):
     """A StringIO that also records when each line began.
 
-    The routes used to stamp every captured line with one time taken after the
-    request had finished, so a long run showed the same second on every line.
-    Recording the time as each line starts gives the real time of each step.
-    getvalue() is unchanged.
+    Recording the time as each line starts gives the real time of each step,
+    rather than one time for the whole request. getvalue() behaves as in
+    StringIO.
     """
 
     def __init__(self):

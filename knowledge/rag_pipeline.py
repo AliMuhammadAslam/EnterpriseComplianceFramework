@@ -104,9 +104,9 @@ class RAGPipeline:
     ) -> str:
         """Retrieve company chunks for several queries, without duplicates.
 
-        One query returning top_k chunks covered only a few sections of a
-        long policy, so an evaluation across many standards reported gaps for
-        content that existed but was never retrieved.
+        One query returning top_k chunks covers only a few sections of a long
+        policy, so an evaluation across many standards would report gaps for
+        content that exists but is never retrieved.
         """
         context, _ = self.retrieve_company_docs_for_queries_with_results(
             user_id, queries, doc_ids=doc_ids

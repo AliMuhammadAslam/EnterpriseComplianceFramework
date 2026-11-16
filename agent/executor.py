@@ -55,8 +55,8 @@ class Executor:
                 errors.append(error_msg)
                 continue
 
-            # A failed call is recorded as a failed step. Returning the error as
-            # step text used to mark it successful and feed it into the answer.
+            # A failed call is recorded as a failed step, so its error text is
+            # never treated as a result or fed into the answer.
             try:
                 result_text = self._execute_with_llm(
                     step, step_results, rag_context, conversation_context

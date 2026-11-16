@@ -79,8 +79,8 @@ class AgentCLI:
                 
     def batch_mode(self, query: str, verbose: bool = False) -> str:
         try:
-            result = self.orchestrator.run(query, verbose=verbose)
-            # Without this a partial failure printed only the partial answer.
+            result = self.orchestrator.run(query, verbose=verbose, user_id="cli_user")
+            # Show a partial failure alongside the partial answer.
             if result.error:
                 return f"{result.result}\n\nNote: part of this request failed: {result.error}"
             return result.result

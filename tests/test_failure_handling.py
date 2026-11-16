@@ -149,5 +149,74 @@ class TestEvaluationFailures(unittest.TestCase):
         self.assertIn("Citation Validation", report)
 
 
+
+def _plan_reply(n_steps, dependencies=None):
+    import json as _json
+    steps = [{"step_number": i, "description": f"step {i}", "tool_required": None,
+              "input_data": {}, "dependencies": (dependencies or {}).get(i, [])}
+             for i in range(1, n_steps + 1)]
+    return _reply(_json.dumps({"goal": "g", "steps": steps}))
+
+
+class TestPlanner(unittest.TestCase):
+
+    def _plan(self, reply, **env):
+        from agent.planner import Planner
+        with mock.patch.dict(os.environ, env), \
+             mock.patch("agent.planner.completion", return_value=reply) as model:
+            plan = Planner().create_plan(SimpleNamespace(
+                structured_input={"original_content": "a question"}, intent="information_seeking"))
+        return plan, model
+
+    def test_model_is_asked_for_json_output(self):
+        _, model = self._plan(_plan_reply(2))
+        self.assertEqual(model.call_args.kwargs.get("response_format"), {"type": "json_object"})
+
+    def test_long_plan_is_cut_to_the_limit(self):
+        plan, _ = self._plan(_plan_reply(10))
+        self.assertEqual([s.step_number for s in plan.steps], [1, 2, 3, 4, 5, 6])
+
+    def test_limit_comes_from_the_environment(self):
+        plan, _ = self._plan(_plan_reply(10), MAX_PLAN_STEPS="3")
+        self.assertEqual(len(plan.steps), 3)
+
+    def test_dependencies_on_dropped_steps_are_removed(self):
+        plan, _ = self._plan(_plan_reply(8, dependencies={2: [1, 7]}), MAX_PLAN_STEPS="3")
+        self.assertEqual(plan.steps[1].dependencies, [1])
+
+    def test_dependency_written_as_text_does_not_reject_the_plan(self):
+        plan, _ = self._plan(_plan_reply(3, dependencies={3: ["step_number: 2", "1", "none"]}))
+        self.assertEqual(len(plan.steps), 3)
+        self.assertEqual(plan.steps[2].dependencies, [2, 1])
+
+    def test_dependency_on_a_missing_step_is_removed(self):
+        plan, _ = self._plan(_plan_reply(3, dependencies={3: [1, 9]}))
+        self.assertEqual(plan.steps[2].dependencies, [1])
+
+    def test_unsupported_settings_are_dropped_for_other_models(self):
+        _, model = self._plan(_plan_reply(2))
+        self.assertTrue(model.call_args.kwargs.get("drop_params"))
+
+    def test_short_plan_is_unchanged(self):
+        plan, _ = self._plan(_plan_reply(4))
+        self.assertEqual(len(plan.steps), 4)
+
+    def test_unparseable_reply_still_falls_back_to_one_step(self):
+        plan, _ = self._plan(_reply("not json"))
+        self.assertEqual(len(plan.steps), 1)
+
+
+class TestCommandLineUser(unittest.TestCase):
+
+    def test_batch_mode_uses_the_cli_user_not_the_web_default(self):
+        import main
+        cli = main.AgentCLI.__new__(main.AgentCLI)
+        cli.logger = mock.Mock()
+        cli.orchestrator = mock.Mock()
+        cli.orchestrator.run.return_value = SimpleNamespace(result="answer", error=None)
+        self.assertEqual(cli.batch_mode("a question"), "answer")
+        self.assertEqual(cli.orchestrator.run.call_args.kwargs.get("user_id"), "cli_user")
+
+
 if __name__ == "__main__":
     unittest.main()

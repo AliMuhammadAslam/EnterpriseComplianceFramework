@@ -36,9 +36,9 @@ class UserStore:
     def _load_or_seed(self):
         """Load accounts from disk, seeding the default set on first run only.
 
-        An unreadable file stops start-up. Reseeding it used to overwrite
-        every account with a new password, so a truncated write locked all
-        users out and destroyed the only copy of the hashes.
+        An unreadable file stops start-up rather than being reseeded:
+        reseeding would give every account a new password, so a truncated
+        write would lock all users out and lose the only copy of the hashes.
         """
         if not os.path.exists(self.store_path):
             self._seed_defaults()

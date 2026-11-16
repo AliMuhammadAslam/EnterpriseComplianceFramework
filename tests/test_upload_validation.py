@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from document_upload import validation
 from document_upload.validation import UploadRejected, safe_filename
 
-# The payloads that escaped the upload directory before this was added.
+# Filenames that try to escape the upload directory.
 TRAVERSAL_PAYLOADS = [
     "..\\..\\evil.pdf",
     "../../evil.pdf",
