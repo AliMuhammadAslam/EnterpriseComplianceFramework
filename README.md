@@ -304,7 +304,7 @@ Both default to the development run that the reported tables come from and name 
 python -m unittest discover -s tests
 ```
 
-309 tests across twenty-one files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
+335 tests across twenty-two files, covering audit log hash chaining and tamper detection, citation validation, risk score checking, evidence traces for chat and evaluations, upload hardening and integrity, report path containment, per-standard retrieval, knowledge base re-indexing, memory persistence, web error handling, dashboard figures, and cross-tenant data isolation. Embeddings and model calls are stubbed, so the suite makes no API calls, though `OPENAI_API_KEY` must be set for the client to start. Tests for a fix were checked against the code before the fix, to confirm they fail there, rather than assumed to be meaningful.
 
 ---
 
@@ -368,6 +368,7 @@ DEFAULT_MODEL=gpt-4o-2024-08-06
 SEED=42
 TEMPERATURE=0.0
 MAX_TOKENS=6000
+MAX_PLAN_STEPS=6
 
 # Memory
 MEMORY_FILE=agent_memory.json
@@ -476,6 +477,8 @@ The system retrieves your selected documents and the relevant regulatory standar
 
 The top of each report shows a short summary counted from its own tables: how many standards had findings, documentation gaps or were not applicable, and how many gaps fall in each priority band. A report can be opened from the chat or from **Report History**, copied, downloaded as Markdown, or printed (the browser's print dialog also offers Save as PDF).
 
+**Dashboard.** The **Dashboard** tab beside **Chat** summarises the saved evaluations: headline figures with the change since the previous evaluation, gaps by priority band, a severity-by-likelihood risk matrix, gaps by standard, the trend across evaluations, standards coverage over time, and the top risks, each of which opens its report. Every figure is read from the Standards Coverage and Regulatory Risk Score tables of the saved reports, after the risk score check has corrected them; rows that cannot be read are counted and left out rather than estimated, and a report whose table cannot be read shows its figures as not available rather than as zero. Any evaluation can be selected, every chart has a table view, and the dashboard refreshes when an evaluation finishes or a report is deleted.
+
 ### Audit Trail and Accessibility
 The **Audit Trail** panel can be filtered by action, or to failures only. The interface follows the system's light or dark setting, and can be used with the keyboard: dialogs close with Escape and keep focus inside while open, and the upload area and report list respond to Enter.
 
@@ -496,6 +499,7 @@ All data endpoints require an authenticated session. Requests without a valid se
 | `DELETE` | `/documents/<doc_id>` | Delete a specific document and its vector chunks |
 | `POST` | `/evaluate` | Run compliance evaluation; body: `{standards, doc_ids}` (max 10 standards) |
 | `GET` | `/reports` | List saved evaluation reports for the current user |
+| `GET` | `/dashboard/data` | Dashboard figures read from the current user's saved reports: coverage status per standard and scored gaps per evaluation |
 | `GET` | `/reports/<report_id>` | Retrieve a specific report |
 | `DELETE` | `/reports/<report_id>` | Delete a specific report |
 | `GET` | `/reports/<report_id>/download` | Download a report as a Markdown file |
@@ -542,6 +546,7 @@ All settings are controlled via environment variables with sensible defaults bui
 | `SEED` | `42` | Request seed passed to every completion call |
 | `TEMPERATURE` | `0.0` | LLM temperature; 0 reduces sampling variability but does not guarantee determinism on its own |
 | `MAX_TOKENS` | `6000` | Max tokens per LLM response (set higher for large evaluations) |
+| `MAX_PLAN_STEPS` | `6` | Maximum number of steps in a chat plan; each step is a separate model call |
 | `CHROMA_DB_PATH` | `./chroma_db` | ChromaDB persistence directory |
 | `EMBEDDING_MODEL` | `text-embedding-3-small` | OpenAI embedding model |
 | `CHUNK_SIZE` | `500` | Words per document chunk |
