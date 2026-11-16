@@ -357,6 +357,12 @@
         .btn-success:disabled { opacity: 0.5; cursor: not-allowed; transform: none; filter: none; }
 
         .eval-hint { font-size: 0.72rem; color: var(--text-muted); line-height: 1.4; }
+        .eval-company-note {
+            font-size: 0.74rem; line-height: 1.45; color: #fde68a;
+            background: rgba(245, 158, 11, 0.12); border-left: 3px solid var(--warning);
+            border-radius: 6px; padding: 0.5rem 0.6rem; margin-bottom: 0.6rem;
+        }
+        .eval-company-note[hidden] { display: none; }
 
         /* Audit log panel */
         .audit-log-list { max-height: 200px; overflow-y: auto; }
@@ -1405,6 +1411,7 @@
                                 <span id="standardsCounter" style="font-weight:400; text-transform:none; letter-spacing:normal; color:var(--text-muted);"></span>
                             </label>
                             <div class="standards-grid" id="standardsGrid"></div>
+                            <div class="eval-company-note" id="evalCompanyNote" role="note" hidden></div>
                             <button class="btn-success" onclick="runEvaluation()" id="evalButton">
                                 Run Compliance Evaluation
                             </button>
@@ -1950,6 +1957,7 @@
                 const data = await res.json();
                 const list = document.getElementById('docList');
                 const healthDocs = document.getElementById('healthDocs');
+                const ticked = new Set(getSelectedDocIds());
                 list.innerHTML = '';
                 const docs = data.documents || [];
                 healthDocs.textContent = docs.length;
@@ -1957,8 +1965,8 @@
                     const div = document.createElement('div');
                     div.className = 'doc-item';
                     div.innerHTML = `
-                        <input type="checkbox" class="doc-select-checkbox" data-doc-id="${doc.doc_id}" checked
-                            title="Include this document in the next evaluation">
+                        <input type="checkbox" class="doc-select-checkbox" data-doc-id="${doc.doc_id}" ${ticked.has(doc.doc_id) ? 'checked' : ''}
+                            title="Include this document in the next evaluation" onchange="updateEvalButtonState()">
                         <span class="doc-name" title="${doc.original_filename}">${doc.original_filename}</span>
                         <span class="doc-meta">${doc.chunk_count} chunks</span>
                         <button class="delete-btn" onclick="deleteDocument('${doc.doc_id}')" title="Delete" aria-label="Delete ${doc.original_filename}">${iconSvg('x')}</button>`;
@@ -1975,8 +1983,17 @@
         function updateEvalButtonState() {
             if (_evalInFlight) return;
             const hasDocs = getTotalDocCount() > 0;
-            document.getElementById('evalButton').disabled = !hasDocs;
-            document.getElementById('evalHint').style.display = hasDocs ? 'none' : 'block';
+            const ticked = getSelectedDocIds().length;
+            const hint = document.getElementById('evalHint');
+            document.getElementById('evalButton').disabled = ticked === 0;
+            hint.style.display = ticked === 0 ? 'block' : 'none';
+            hint.textContent = hasDocs
+                ? "Tick one company's documents in Company Documents to run an evaluation."
+                : 'Upload a company document to run an evaluation.';
+            // Ticked documents are assessed together as one company's evidence.
+            const note = document.getElementById('evalCompanyNote');
+            note.hidden = ticked < 2;
+            note.textContent = `⚠ ${ticked} documents are ticked and will be evaluated together as one company. Tick only one company's documents.`;
         }
 
         function uploadFile(input) { if (input.files.length > 0) uploadFiles(input.files); }

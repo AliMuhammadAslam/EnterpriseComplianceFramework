@@ -462,7 +462,7 @@ Drag and drop, or click to browse, one or more company documents (PDF, DOCX, or 
 Uploaded files are treated as untrusted input. The filename is reduced to a bare basename before it touches any path, which closes a directory traversal issue found during testing where a crafted filename could write outside the user's own upload folder. The file's contents are checked against its claimed extension, so a renamed executable is rejected rather than parsed. Page count, paragraph count, and extracted character count are capped before parsing. Text inside a document that addresses the model rather than the reader is marked and left in place, since silently deleting it would hide part of the document being assessed. These checks reduce the attack surface but do not eliminate prompt injection.
 
 ### Compliance Evaluation
-1. Select which uploaded documents to include using the checkboxes
+1. Tick the uploaded documents to include. Documents start unticked, and ticked documents are evaluated together as one company's documentation, so tick only one company's documents at a time (a note appears when more than one is ticked)
 2. Select up to ten standards from the evaluation panel
 3. Click **Run Compliance Evaluation**
 
